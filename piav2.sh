@@ -1,169 +1,270 @@
 #!/bin/bash
 
 # ==============================================================================
-# SCRIPT DE INICIALIZAÇÃO E SINCRONIZAÇÃO GIT
+# SCRIPT DE GERENCIAMENTO DE FLUXO E VALIDAÇÃO DE PROJETO GIT
 #
-# Este script verifica o ambiente Git, valida o projeto, e agora
-# também configura o 'remote origin' e faz o primeiro push, se necessário.
+# Este script verifica o estado do projeto (local vs. remoto) e oferece um
+# menu condicional de ações baseadas na fase atual (Inicialização, Push Inicial,
+# ou Desenvolvimento Contínuo).
 # ==============================================================================
 
-# Variáveis
+# Variáveis e Utilitários
 DEFAULT_BRANCH="main"
-PROJECT_STATUS="INDEFINIDO"
-REPO_URL=""
-MAIN_BRANCH=""
+YELLOW='\033[1;33m'
+GREEN='\033[1;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# Funções de Log e Erro
+# Função de Log
 log() {
-    echo "✅ PIA: $1"
+    echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-log_warning() {
-    echo "⚠️ AVISO DO PIA: $1"
-}
-
+# Função de Saída em Caso de Falha
 fail_exit() {
-    echo "❌ ERRO DO PIA: $1"
-    echo "✅ PIA: =================================================="
-    echo "✅ PIA: PROJETO FALHOU. STATUS FINAL: FALHA_EXECUCAO"
-    echo "✅ PIA: =================================================="
+    echo -e "${RED}🚨 ERRO: $1${NC}"
     exit 1
 }
 
-# --- 1. VERIFICAÇÃO DO AMBIENTE ---
-log "1. Verificando ambiente..."
+# Função principal para determinar o status do projeto
+get_project_status() {
+    # 1. Verifica se já é um repositório Git
+    if ! git rev-parse --is-inside-work-tree &> /dev/null
+    then
+        echo "PHASE_INIT_LOCAL" # Repositório local não iniciado
+        return
+    fi
 
-if ! command -v git &> /dev/null
-then
-    echo "🚨 ERRO: Git não está instalado. Por favor, instale o Git para continuar."
-    exit 1
-fi
-
-log "   - Git verificado e funcional."
-
-# --- 2. VERIFICA SE JÁ É UM REPOSITÓRIO GIT ---
-log "2. Verificando status do repositório..."
-
-if git rev-parse --is-inside-work-tree &> /dev/null
-then
-    # Repositório Existente
-    PROJECT_ROOT=$(git rev-parse --show-toplevel)
-    MAIN_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    
-    log "   - Você está DENTRO de um repositório Git."
-    log "   - Raiz do Projeto (Validação da Pasta): $PROJECT_ROOT"
-    log "   - Branch Atual: $MAIN_BRANCH"
-
-    # 3. VERIFICA URL REMOTA
-    log "3. Verificando URL remota (origin)..."
-    REPO_URL=$(git config --get remote.origin.url)
-
+    # 2. Verifica a existência do remoto (origin)
+    local REPO_URL=$(git config --get remote.origin.url)
     if [ -z "$REPO_URL" ]; then
-        PROJECT_STATUS="NAO_CONECTADO"
-        log_warning "Repositório Git não tem um 'remote origin' configurado."
+        echo "PHASE_CONFIG_REMOTE" # Repositório local, mas sem URL remota
+        return
+    fi
+
+    # 3. Verifica se há um branch remoto rastreado (indicando o primeiro push)
+    if ! git rev-parse --abbrev-ref --symbolic-full-name @{u} &> /dev/null; then
+        # Se não houver upstream (branch remoto rastreado), estamos na fase de PUSH INICIAL
+        echo "PHASE_INITIAL_PUSH"
+        return
+    fi
+
+    # 4. Se houver remoto, verifica o estado de sincronização
+    # Tenta buscar (fetch) as alterações do remoto silenciosamente
+    git fetch origin > /dev/null 2>&1
+
+    local LOCAL=$(git rev-parse @)
+    local REMOTE=$(git rev-parse @{u})
+    local BASE=$(git merge-base @ @{u})
+
+    if [ "$LOCAL" = "$REMOTE" ]; then
+        # Local e remoto estão iguais
+        echo "PHASE_ORGANIZED"
+    elif [ "$LOCAL" != "$REMOTE" ] && [ "$BASE" = "$LOCAL" ]; then
+        # O remoto está à frente (precisa de PULL)
+        echo "PHASE_PULL_NEEDED"
+    elif [ "$LOCAL" != "$REMOTE" ] && [ "$BASE" = "$REMOTE" ]; then
+        # O local está à frente (precisa de PUSH)
+        echo "PHASE_DEVELOPMENT"
     else
-        PROJECT_STATUS="CONECTADO"
-        log "   - URL Remota: $REPO_URL"
+        # Branches divergiram
+        echo "PHASE_DIVERGED"
+    fi
+}
+
+# Função para iniciar o repositório local
+init_local_repo() {
+    log "Inicializando um novo repositório Git local..."
+    git init || fail_exit "Falha ao inicializar o repositório Git."
+    git checkout -b "$DEFAULT_BRANCH" > /dev/null 2>&1 || git branch -M "$DEFAULT_BRANCH" # Cria ou renomeia para a branch padrão
+    log "Repositório Git local criado com sucesso na branch '$DEFAULT_BRANCH'."
+    echo ""
+    log "PRÓXIMO PASSO CRÍTICO: Crie seus arquivos iniciais (README.md, .gitignore, etc.) e configure o remoto."
+    sleep 2
+}
+
+# Função para configuração remota
+config_remote() {
+    echo ""
+    echo -e "${YELLOW}========================================================================${NC}"
+    echo -e "${YELLOW}        PASSO 1/2: CONFIGURAR O REPOSITÓRIO REMOTO (ONLINE)             ${NC}"
+    echo -e "${YELLOW}========================================================================${NC}"
+    read -p "Por favor, insira a URL do seu repositório remoto (ex: git@github.com:user/repo.git): " REPO_URL
+
+    # Adiciona o remoto e verifica se deu certo
+    git remote add origin "$REPO_URL" 2> /dev/null || git remote set-url origin "$REPO_URL"
+    if [ $? -ne 0 ]; then
+        fail_exit "URL remota inválida ou falha ao configurar o 'origin'. Verifique a URL fornecida."
     fi
 
-else
-    # Inicializa Novo Repositório Local
-    log "   - Repositório não encontrado. Inicializando novo repositório local..."
-    git init -b "$DEFAULT_BRANCH" || fail_exit "Falha ao inicializar o Git localmente."
-    MAIN_BRANCH="$DEFAULT_BRANCH"
-    PROJECT_STATUS="NAO_CONECTADO"
-    log "   - Repositório local inicializado com sucesso na branch '$MAIN_BRANCH'."
-    log_warning "Repositório Git não tem um 'remote origin' configurado. Inicialização remota será necessária."
-fi
+    log "URL remota 'origin' configurada para: $REPO_URL"
+    echo ""
+    log "PRÓXIMO PASSO: Faça o PUSH INICIAL dos seus arquivos de documentação."
+    sleep 2
+}
 
-# --- 4. TRATAMENTO DO STATUS: NAO_CONECTADO ---
-if [ "$PROJECT_STATUS" = "NAO_CONECTADO" ]; then
-    log "4. Inicializando conexão com repositório online..."
+# Função para o primeiro push (criação do remoto)
+initial_push() {
+    echo ""
+    echo -e "${YELLOW}========================================================================${NC}"
+    echo -e "${YELLOW}        PASSO 2/2: PUSH INICIAL (DOCUMENTAÇÃO E ARQUIVOS BASE)          ${NC}"
+    echo -e "${YELLOW}========================================================================${NC}"
 
-    # Pede a URL remota ao usuário
-    echo "=================================================="
-    echo "ATENÇÃO: É necessário configurar o repositório online (Remote Origin)."
-    read -r -p "Por favor, cole a URL Git (HTTPS ou SSH) do seu repositório online (Ex: git@github.com:user/repo.git): " REMOTE_URL
-    echo "=================================================="
-
-    if [ -z "$REMOTE_URL" ]; then
-        fail_exit "URL remota não fornecida. Impossível configurar a conexão."
+    # Validação de arquivos iniciais (Ex: README.md)
+    if [ ! -f "README.md" ]; then
+        log "AVISO: O arquivo README.md não foi encontrado. Criando um placeholder."
+        echo "# Nome do Projeto" > README.md
+        echo "## Status: Em Desenvolvimento Inicial" >> README.md
     fi
 
-    log "   - Configurando 'remote origin' para: $REMOTE_URL"
-    git remote add origin "$REMOTE_URL" || fail_exit "Falha ao adicionar o remote origin."
-    
-    # Realiza o primeiro commit (se houver arquivos) e push
-    log "   - Preparando primeiro commit e push inicial..."
-    
-    # Adiciona todos os arquivos
+    log "Adicionando todos os arquivos ao stage..."
     git add . || fail_exit "Falha ao adicionar arquivos ao stage."
+
+    log "Criando Commit Inicial..."
+    local COMMIT_MSG="[INIT] Setup inicial do projeto e documentação base."
+    git commit -m "$COMMIT_MSG" || log "AVISO: Não há nada para commitar, pulando commit." # Permite continuar mesmo sem alterações
+
+    log "Executando Push Inicial para a branch '$DEFAULT_BRANCH' e configurando upstream..."
+    # A flag -u (ou --set-upstream) é crucial para esta fase
+    git push -u origin "$DEFAULT_BRANCH" || fail_exit "Falha catastrófica ao executar o PUSH INICIAL. Verifique suas credenciais Git/SSH e permissões."
+
+    log "🎉 PROJETO INICIALIZADO! A pasta local está sincronizada com o remoto."
+    echo ""
+    log "Agora você pode prosseguir com o desenvolvimento. Rodando o script novamente..."
+    sleep 3
+    # Chama a função principal novamente para reavaliar o status
+    main_menu
+}
+
+
+# Função para o menu principal em fases posteriores
+show_main_menu() {
+    local STATUS="$1"
     
-    # Verifica se há algo para commitar (evita erro)
-    if git diff --cached --exit-code --quiet; then
-        log "AVISO: Nenhum arquivo novo ou modificado para o commit inicial."
-    else
-        COMMIT_MSG="[INIT] Setup inicial do projeto via pia.sh em $(date '+%Y-%m-%d %H:%M:%S')."
-        git commit -m "$COMMIT_MSG" || fail_exit "Falha ao criar o commit inicial."
-        log "   - Commit inicial criado."
+    echo ""
+    echo -e "${YELLOW}========================================================================${NC}"
+    echo -e "${YELLOW}        FLUXO DE PROJETO: [${STATUS}]                                   ${NC}"
+    echo -e "${YELLOW}========================================================================${NC}"
+    echo "O projeto se encontra na fase: ${YELLOW}${STATUS}${NC}"
+    echo "O que você gostaria de fazer agora?"
+    echo ""
+    
+    # Menu Condicional
+    case "$STATUS" in
+        PHASE_PULL_NEEDED)
+            echo "1) 📥 PULL: Baixar e integrar as alterações mais recentes do repositório remoto."
+            echo "2) ⚙️ STATUS: Mostrar o status detalhado do Git."
+            echo "x) SAIR."
+            read -p "Opção (1/2/x): " choice
+            case "$choice" in
+                1) git pull origin "$DEFAULT_BRANCH" || fail_exit "Falha ao executar PULL. Resolva conflitos e tente novamente.";;
+                2) git status;;
+                x) exit 0;;
+                *) echo "Opção inválida.";;
+            esac
+            ;;
+
+        PHASE_DEVELOPMENT | PHASE_DIVERGED)
+            echo "1) ➕ COMMIT & PUSH: Adicionar, commitar e enviar alterações locais para o remoto."
+            echo "2) ⚙️ STATUS: Mostrar o status detalhado do Git."
+            echo "3) 🔄 PULL: Baixar (apenas se for DIVERGED ou se souber que o remoto está na frente)."
+            echo "x) SAIR."
+            read -p "Opção (1/2/3/x): " choice
+            case "$choice" in
+                1) 
+                    read -p "Mensagem de Commit (Ex: feat: Implementa feature X): " COMMIT_MSG
+                    git add . || fail_exit "Falha ao adicionar arquivos ao stage."
+                    git commit -m "$COMMIT_MSG" || log "AVISO: Não há alterações para commitar."
+                    git push origin "$DEFAULT_BRANCH" || fail_exit "Falha ao executar PUSH. Verifique se precisa de PULL primeiro."
+                    log "PUSH concluído. Sincronizado."
+                    ;;
+                2) git status;;
+                3) git pull origin "$DEFAULT_BRANCH" || fail_exit "Falha ao executar PULL. Resolva conflitos e tente novamente.";;
+                x) exit 0;;
+                *) echo "Opção inválida.";;
+            esac
+            ;;
+
+        PHASE_ORGANIZED)
+            echo "✅ Repositório Sincronizado (Local e Remoto estão iguais)."
+            echo "O projeto está pronto para o próximo ciclo de desenvolvimento (POC Estável)."
+            echo "1) ⚙️ STATUS: Mostrar o status detalhado do Git."
+            echo "2) 🚀 INICIAR POC: Comando de build/teste (Simulação)."
+            echo "x) SAIR."
+            read -p "Opção (1/2/x): " choice
+            case "$choice" in
+                1) git status;;
+                2) log "Simulando comando de INICIAR POC (Ex: docker build ou npm run dev)...";;
+                x) exit 0;;
+                *) echo "Opção inválida.";;
+            esac
+            ;;
+        *)
+            echo "Opções padrão:"
+            echo "1) ⚙️ STATUS: Mostrar o status detalhado do Git."
+            echo "x) SAIR."
+            read -p "Opção (1/x): " choice
+            case "$choice" in
+                1) git status;;
+                x) exit 0;;
+                *) echo "Opção inválida.";;
+            esac
+            ;;
+    esac
+}
+
+
+# Função principal de controle
+main_menu() {
+    # 1. Verifica se o Git está instalado
+    if ! command -v git &> /dev/null
+    then
+        fail_exit "Git não está instalado. Por favor, instale o Git para continuar."
     fi
 
-    log "   - Enviando (push) inicial para $MAIN_BRANCH e definindo rastreamento (upstream)..."
-    # O comando -u (ou --set-upstream) é crucial no primeiro push
-    git push -u origin "$MAIN_BRANCH" || fail_exit "Falha no PUSH inicial. Verifique suas credenciais e a URL remota."
+    local PROJECT_STATUS=$(get_project_status)
 
-    PROJECT_STATUS="CONECTADO"
-    log "✅ Conexão remota e push inicial concluídos com sucesso!"
-fi
-
-
-# --- 5. VALIDAÇÃO INTERNA (BUILD/TEST) ---
-log "5. Executando validação interna do projeto (Build/Test)..."
-
-# --- SIMULAÇÃO DE BUILD/TEST (Substituir) ---
-echo "Simulando processo de build/teste... [Substitua esta linha pelo seu comando real de build/validação]"
-# if [ $? -ne 0 ]; then
-#     fail_exit "Falha na validação do projeto (Build/Test)."
-# # fi
-
-log "Validação interna concluída com sucesso."
-
-# --- 6. EXECUÇÃO DA SINCRONIZAÇÃO (PUSH) - Apenas se CONECTADO ---
-log "6. Executando sincronização de alterações locais (PUSH)..."
-
-if [ "$PROJECT_STATUS" = "CONECTADO" ]; then
-    # Checa se há modificações locais pendentes (tracked files)
-    if ! git diff --exit-code --quiet || ! git diff --cached --exit-code --quiet; then
-        log "   - Alterações locais detectadas. Preparando commit e push..."
-
-        # Adiciona todos os arquivos modificados e novos (incluindo untracked)
-        git add . || fail_exit "Falha ao adicionar arquivos ao stage."
+    case "$PROJECT_STATUS" in
+        PHASE_INIT_LOCAL)
+            init_local_repo
+            # O status é recalculado após a inicialização local
+            PROJECT_STATUS=$(get_project_status) 
+            # Continua para a próxima verificação (PHASE_CONFIG_REMOTE)
+            ;& # Fallthrough para o próximo case
         
-        # Cria a mensagem de commit
-        COMMIT_MSG="[SYNC] Sincronização automática em $(date '+%Y-%m-%d %H:%M:%S')."
+        PHASE_CONFIG_REMOTE)
+            config_remote
+            # O status é recalculado após a configuração remota
+            PROJECT_STATUS=$(get_project_status) 
+            # Continua para a próxima verificação (PHASE_INITIAL_PUSH)
+            ;& # Fallthrough para o próximo case
 
-        # Tenta commitar. Se não houver mudanças após o 'git add', o commit falhará, mas não deve ser considerado um erro fatal.
-        git commit -m "$COMMIT_MSG" 
+        PHASE_INITIAL_PUSH)
+            initial_push
+            # Retorna aqui após o push inicial ser feito com sucesso
+            ;;
+
+        PHASE_PULL_NEEDED | PHASE_DEVELOPMENT | PHASE_ORGANIZED | PHASE_DIVERGED)
+            show_main_menu "$PROJECT_STATUS"
+            ;;
         
-        if [ $? -ne 0 ]; then
-             log "AVISO: Nada para commitar após o 'git add'. (Pode ser apenas arquivos untracked que já foram adicionados antes)."
-        else
-            log "   - Commit criado."
-        fi
+        REMOTE_UNREACHABLE)
+            fail_exit "O repositório remoto está inacessível. Verifique sua conexão ou a URL remota."
+            ;;
+        
+        *)
+            fail_exit "Status desconhecido: $PROJECT_STATUS. Reinicie o script ou investigue o estado do Git."
+            ;;
+    esac
 
-        log "   - Enviando (push) alterações para o repositório remoto..."
-        git push origin "$MAIN_BRANCH" || fail_exit "Falha ao enviar (push) as alterações para o repositório remoto."
-
-        log "✅ Sincronização (PUSH) concluída com sucesso."
-    else
-        log "   - Repositório local está limpo. Nenhuma sincronização (PUSH) necessária."
+    # Após uma ação, mostra o menu novamente se o estado final não for 'SAIR'
+    if [ "$choice" != "x" ]; then
+        echo ""
+        log "Ação concluída. Reavaliando o estado do projeto..."
+        sleep 2
+        main_menu
     fi
-else
-    log_warning "Status '$PROJECT_STATUS' não permite PUSH automático nesta etapa."
-fi
+}
 
-
-# --- FIM DO PROCESSAMENTO ---
-log "=================================================="
-log "PROJETO CONCLUÍDO. STATUS FINAL: $PROJECT_STATUS"
-log "=================================================="
+# Executa o script
+main_menu
