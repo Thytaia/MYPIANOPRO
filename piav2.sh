@@ -136,7 +136,6 @@ initial_push() {
     main_menu
 }
 
-
 # Função para o menu principal em fases posteriores
 show_main_menu() {
     local STATUS="$1"
@@ -212,7 +211,6 @@ show_main_menu() {
             ;;
     esac
 }
-
 
 # Função principal de controle
 main_menu() {
