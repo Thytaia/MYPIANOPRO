@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Interativo - 67 Teclas Profissional</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --keyboard-bg: #1a1a1a;
+            --white-key: #ffffff;
+            --black-key: #000000;
+            --active-white: #f1c40f;
+            --active-black: #f39c12;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a3a, #2c3e50);
+            color: var(--light-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: var(--light-color);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #bdc3c7;
+            margin-bottom: 20px;
+        }
+        
+        .control-panel {
+            background: rgba(44, 62, 80, 0.9);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 1400px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        
+        .octave-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .octave-btn {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 15px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .octave-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .octave-display {
+            font-size: 1.2rem;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .effects-panel {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .effect-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .effect-btn.active {
+            background: var(--accent-color);
+        }
+        
+        .effect-btn:hover {
+            background: #4a6b8a;
+        }
+        
+        .presets-panel {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .preset-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .preset-btn.active {
+            background: var(--secondary-color);
+        }
+        
+        .preset-btn:hover {
+            background: #4a6b8a;
+        }
+        
+        .keyboard-container {
+            background: var(--keyboard-bg);
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 1400px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            overflow-x: auto;
+        }
+        
+        .keyboard {
+            display: flex;
+            position: relative;
+            height: 220px;
+            margin-bottom: 20px;
+            min-width: 1200px;
+        }
+        
+        .white-key {
+            width: 40px;
+            height: 100%;
+            background: var(--white-key);
+            border: 1px solid #ccc;
+            border-radius: 0 0 6px 6px;
+            position: relative;
+            cursor: pointer;
+            z-index: 1;
+            transition: all 0.1s ease;
+            box-shadow: inset 0 -2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .white-key.active {
+            background: linear-gradient(to bottom, #f1c40f, #e67e22);
+            transform: translateY(2px);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .black-key {
+            width: 24px;
+            height: 65%;
+            background: linear-gradient(to bottom, #000000, #333333);
+            border-radius: 0 0 4px 4px;
+            position: absolute;
+            top: 0;
+            z-index: 2;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+        
+        .black-key.active {
+            background: linear-gradient(to bottom, #f39c12, #d35400);
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .key-label {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #333;
+            pointer-events: none;
+            font-weight: 600;
+        }
+        
+        .black-key .key-label {
+            color: white;
+            font-size: 0.6rem;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            text-align: center;
+            color: #bdc3c7;
+            font-size: 0.9rem;
+            max-width: 1400px;
+        }
+        
+        .status-bar {
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(44, 62, 80, 0.8);
+            border-radius: 6px;
+            width: 100%;
+            max-width: 1400px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        
+        .velocity-indicator {
+            margin-top: 10px;
+            height: 8px;
+            background: #34495e;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .velocity-fill {
+            height: 100%;
+            background: linear-gradient(to right, #2ecc71, #f1c40f, #e74c3c);
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+        
+        @media (max-width: 768px) {
+            .control-panel {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .white-key {
+                width: 35px;
+            }
+            
+            .black-key {
+                width: 20px;
+            }
+            
+            .keyboard {
+                min-width: 1000px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Piano Profissional - 67 Teclas</h1>
+        <div class="subtitle">Sensibilidade real e som natural sem ruídos</div>
+    </header>
+    
+    <div class="control-panel">
+        <div class="octave-selector">
+            <button class="octave-btn" id="octave-down">-</button>
+            <div class="octave-display" id="octave-display">A2 - C7</div>
+            <button class="octave-btn" id="octave-up">+</button>
+            <span style="margin-left: 10px;">5.5 Oitavas</span>
+        </div>
+        
+        <div class="effects-panel">
+            <button class="effect-btn" id="reverb-btn">
+                <span>Reverb</span>
+            </button>
+            <button class="effect-btn" id="chorus-btn">
+                <span>Chorus</span>
+            </button>
+            <button class="effect-btn" id="delay-btn">
+                <span>Delay</span>
+            </button>
+            <button class="effect-btn" id="tremolo-btn">
+                <span>Tremolo</span>
+            </button>
+        </div>
+        
+        <div class="presets-panel">
+            <button class="preset-btn active" data-preset="piano">Piano</button>
+            <button class="preset-btn" data-preset="epiano">E. Piano</button>
+            <button class="preset-btn" data-preset="organ">Organ</button>
+            <button class="preset-btn" data-preset="strings">Strings</button>
+            <button class="preset-btn" data-preset="bass">Bass</button>
+        </div>
+    </div>
+    
+    <div class="keyboard-container">
+        <div class="keyboard" id="keyboard">
+            <!-- Teclas serão geradas dinamicamente via JavaScript -->
+        </div>
+        <div class="velocity-indicator">
+            <div class="velocity-fill" id="velocity-fill"></div>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        Pressione INSERT para alternar entre presets | Use Z/X para mudar de oitava | Sensibilidade de velocidade ativa
+    </div>
+    
+    <div class="status-bar" id="status-bar">
+        Preset atual: Piano | Efeitos: Nenhum | Sensibilidade: Ativa
+    </div>
+
+    <script>
+        // ===== CONFIGURAÇÕES AVANÇADAS DE ÁUDIO =====
+        class AdvancedPianoEngine {
+            constructor() {
+                this.audioContext = null;
+                this.masterGain = null;
+                this.activeVoices = new Map();
+                this.velocity = 0.7;
+                this.init();
+            }
+            
+            init() {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.masterGain = this.audioContext.createGain();
+                    this.masterGain.gain.value = 0.6;
+                    this.masterGain.connect(this.audioContext.destination);
+                    
+                    // Filtro para eliminar ruídos de alta frequência
+                    this.lowpassFilter = this.audioContext.createBiquadFilter();
+                    this.lowpassFilter.type = 'lowpass';
+                    this.lowpassFilter.frequency.value = 8000;
+                    this.lowpassFilter.connect(this.masterGain);
+                    
+                    console.log("Motor de áudio profissional inicializado");
+                } catch (error) {
+                    console.error("Erro ao inicializar áudio:", error);
+                }
+            }
+            
+            // Sistema de sensibilidade de velocidade
+            calculateVelocity(keyPressTime) {
+                const now = performance.now();
+                const timeSinceLastKey = now - (this.lastKeyTime || 0);
+                this.lastKeyTime = now;
+                
+                // Velocidade baseada no tempo entre teclas
+                let velocity = Math.max(0.3, Math.min(1.0, 1.0 - (timeSinceLastKey / 1000)));
+                
+                // Adicionar variação aleatória natural
+                velocity *= (0.95 + Math.random() * 0.1);
+                
+                return Math.min(1.0, velocity);
+            }
+            
+            // Tocar nota com sensibilidade avançada
+            playNote(note, velocity = null) {
+                if (!this.audioContext) this.init();
+                if (this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+                
+                const calculatedVelocity = velocity || this.calculateVelocity();
+                this.velocity = calculatedVelocity;
+                
+                // Atualizar indicador visual
+                document.getElementById('velocity-fill').style.width = `${calculatedVelocity * 100}%`;
+                
+                // Parar voz anterior se existir (para evitar sobreposição)
+                if (this.activeVoices.has(note)) {
+                    this.stopNote(note);
+                }
+                
+                const now = this.audioContext.currentTime;
+                const frequency = this.getFrequencyForNote(note);
+                
+                // Criar oscilador principal
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                // Configurar baseado no preset
+                this.configurePreset(oscillator, gainNode, frequency, calculatedVelocity, now);
+                
+                // Conexão com filtro anti-ruído
+                oscillator.connect(gainNode);
+                gainNode.connect(this.lowpassFilter);
+                
+                oscillator.start(now);
+                
+                // Armazenar voz ativa
+                this.activeVoices.set(note, { oscillator, gainNode, startTime: now });
+                
+                return { oscillator, gainNode };
+            }
+            
+            // Configurações específicas por preset
+            configurePreset(oscillator, gainNode, frequency, velocity, now) {
+                const preset = window.currentPreset || 'piano';
+                
+                switch(preset) {
+                    case 'piano':
+                        oscillator.type = 'triangle';
+                        // Envelope natural de piano com ataque rápido e decay médio
+                        gainNode.gain.setValueAtTime(0, now);
+                        gainNode.gain.linearRampToValueAtTime(velocity * 0.8, now + 0.005); // Ataque muito rápido
+                        gainNode.gain.exponentialRampToValueAtTime(velocity * 0.3, now + 0.1); // Decay inicial
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.5 + (velocity * 0.5)); // Release
+                        oscillator.stop(now + 2.0 + (velocity * 0.5));
+                        break;
+                        
+                    case 'epiano':
+                        oscillator.type = 'square';
+                        // Envelope mais percussivo
+                        gainNode.gain.setValueAtTime(0, now);
+                        gainNode.gain.linearRampToValueAtTime(velocity * 0.9, now + 0.002);
+                        gainNode.gain.exponentialRampToValueAtTime(velocity * 0.4, now + 0.05);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.0 + (velocity * 0.3));
+                        oscillator.stop(now + 1.2 + (velocity * 0.3));
+                        break;
+                        
+                    case 'organ':
+                        oscillator.type = 'sawtooth';
+                        // Sustain constante
+                        gainNode.gain.setValueAtTime(0, now);
+                        gainNode.gain.linearRampToValueAtTime(velocity * 0.7, now + 0.1);
+                        break;
+                        
+                    case 'strings':
+                        oscillator.type = 'sine';
+                        // Ataque suave e sustain longo
+                        gainNode.gain.setValueAtTime(0, now);
+                        gainNode.gain.linearRampToValueAtTime(velocity * 0.6, now + 0.2);
+                        gainNode.gain.linearRampToValueAtTime(velocity * 0.4, now + 2.0);
+                        break;
+                        
+                    case 'bass':
+                        oscillator.type = 'sawtooth';
+                        frequency = frequency / 2; // Uma oitava abaixo
+                        oscillator.frequency.value = frequency;
+                        // Envelope curto e punchy
+                        gainNode.gain.setValueAtTime(0, now);
+                        gainNode.gain.linearRampToValueAtTime(velocity * 0.9, now + 0.01);
+                        gainNode.gain.exponentialRampToValueAtTime(velocity * 0.2, now + 0.1);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+                        oscillator.stop(now + 1.0);
+                        break;
+                }
+                
+                oscillator.frequency.value = frequency;
+                
+                // Adicionar detune sutil para naturalidade
+                oscillator.detune.value = (Math.random() - 0.5) * 10;
+            }
+            
+            // Parar nota com fade-out suave
+            stopNote(note) {
+                const voice = this.activeVoices.get(note);
+                if (voice) {
+                    const now = this.audioContext.currentTime;
+                    const { gainNode, oscillator } = voice;
+                    
+                    // Fade-out suave para evitar clicks
+                    gainNode.gain.cancelScheduledValues(now);
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                    
+                    setTimeout(() => {
+                        try {
+                            if (oscillator) {
+                                oscillator.stop();
+                            }
+                            this.activeVoices.delete(note);
+                        } catch (e) {
+                            // Ignora erros de já ter parado
+                        }
+                    }, 100);
+                }
+            }
+            
+            // Obter frequência da nota
+            getFrequencyForNote(note) {
+                const baseNote = note.replace(/\d/, '');
+                const octave = parseInt(note.replace(/\D/, '')) || 4;
+                
+                const noteFrequencies = {
+                    'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+                    'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+                    'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+                };
+                
+                return (noteFrequencies[baseNote] || 440) * Math.pow(2, octave - 4);
+            }
+        }
+
+        // ===== SISTEMA PRINCIPAL DO PIANO =====
+        let pianoEngine;
+        let currentOctave = 2; // Começa em A2
+        let activeEffects = [];
+        window.currentPreset = 'piano';
+        
+        // Layout completo do piano - 67 teclas (A2 to C7)
+        const pianoLayout = [
+            { note: 'C', type: 'white', hasBlack: true },
+            { note: 'C#', type: 'black' },
+            { note: 'D', type: 'white', hasBlack: true },
+            { note: 'D#', type: 'black' },
+            { note: 'E', type: 'white', hasBlack: false },
+            { note: 'F', type: 'white', hasBlack: true },
+            { note: 'F#', type: 'black' },
+            { note: 'G', type: 'white', hasBlack: true },
+            { note: 'G#', type: 'black' },
+            { note: 'A', type: 'white', hasBlack: true },
+            { note: 'A#', type: 'black' },
+            { note: 'B', type: 'white', hasBlack: false }
+        ];
+        
+        // Mapeamento expandido para 67 teclas
+        const keyMap = {
+            // Primeira fileira (A2 - B3)
+            'z': 'A2', 's': 'A#2', 'x': 'B2', 'c': 'C3', 'f': 'C#3', 'v': 'D3', 'g': 'D#3',
+            'b': 'E3', 'n': 'F3', 'j': 'F#3', 'm': 'G3', 'k': 'G#3', ',': 'A3', 'l': 'A#3',
+            '.': 'B3',
+            
+            // Segunda fileira (C4 - B4)
+            'q': 'C4', '2': 'C#4', 'w': 'D4', '3': 'D#4', 'e': 'E4', 'r': 'F4', '5': 'F#4',
+            't': 'G4', '6': 'G#4', 'y': 'A4', '7': 'A#4', 'u': 'B4',
+            
+            // Terceira fileira (C5 - B5)
+            'i': 'C5', '9': 'C#5', 'o': 'D5', '0': 'D#5', 'p': 'E5', '[': 'F5', '-': 'F#5',
+            ']': 'G5', '=': 'G#5', '\\': 'A5', 'a': 'A#5', 'z': 'B5',
+            
+            // Quarta fileira (C6 - C7)
+            'x': 'C6', 'c': 'C#6', 'v': 'D6', 'b': 'D#6', 'n': 'E6', 'm': 'F6', ',': 'F#6',
+            '.': 'G6', '/': 'G#6', ';': 'A6', "'": 'A#6', 'd': 'B6', 'f': 'C7'
+        };
+        
+        // Função para criar teclado de 67 teclas
+        function create67KeyKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            keyboard.innerHTML = '';
+            
+            let whiteKeyCount = 0;
+            const startOctave = 2; // A2
+            const totalOctaves = 5.5; // Até C7
+            
+            for (let octave = startOctave; octave < startOctave + totalOctaves; octave++) {
+                // Para a primeira oitava (A2), começamos em A em vez de C
+                let notesInOctave = [...pianoLayout];
+                if (octave === 2) {
+                    notesInOctave = pianoLayout.slice(9); // A, A#, B
+                } else if (octave === 7) {
+                    notesInOctave = pianoLayout.slice(0, 1); // Apenas C
+                }
+                
+                notesInOctave.forEach((key, index) => {
+                    const isBlack = key.type === 'black';
+                    const noteName = key.note + octave;
+                    
+                    if (!isBlack) {
+                        // Tecla branca
+                        const whiteKey = document.createElement('div');
+                        whiteKey.className = 'white-key';
+                        whiteKey.dataset.note = noteName;
+                        
+                        const keyLabel = document.createElement('div');
+                        keyLabel.className = 'key-label';
+                        keyLabel.textContent = getKeyLabel(noteName);
+                        whiteKey.appendChild(keyLabel);
+                        
+                        whiteKey.addEventListener('mousedown', () => handleNoteOn(noteName));
+                        whiteKey.addEventListener('mouseup', () => handleNoteOff(noteName));
+                        whiteKey.addEventListener('mouseleave', () => handleNoteOff(noteName));
+                        
+                        keyboard.appendChild(whiteKey);
+                        
+                        // Adicionar tecla preta se necessário
+                        if (key.hasBlack) {
+                            const blackNoteName = key.note + '#' + octave;
+                            const blackKey = document.createElement('div');
+                            blackKey.className = 'black-key';
+                            blackKey.dataset.note = blackNoteName;
+                            
+                            // Posicionamento preciso
+                            const position = (whiteKeyCount * 40) + 30;
+                            blackKey.style.left = `${position}px`;
+                            
+                            const blackKeyLabel = document.createElement('div');
+                            blackKeyLabel.className = 'key-label';
+                            blackKeyLabel.textContent = getKeyLabel(blackNoteName);
+                            blackKey.appendChild(blackKeyLabel);
+                            
+                            blackKey.addEventListener('mousedown', () => handleNoteOn(blackNoteName));
+                            blackKey.addEventListener('mouseup', () => handleNoteOff(blackNoteName));
+                            blackKey.addEventListener('mouseleave', () => handleNoteOff(blackNoteName));
+                            
+                            keyboard.appendChild(blackKey);
+                        }
+                        
+                        whiteKeyCount++;
+                    }
+                });
+            }
+            
+            document.getElementById('octave-display').textContent = 'A2 - C7';
+        }
+        
+        // Função para obter rótulo da tecla
+        function getKeyLabel(note) {
+            for (const [key, mappedNote] of Object.entries(keyMap)) {
+                if (mappedNote === note) {
+                    return key.toUpperCase();
+                }
+            }
+            return '';
+        }
+        
+        // Funções de controle de notas
+        function handleNoteOn(note) {
+            if (!pianoEngine) pianoEngine = new AdvancedPianoEngine();
+            pianoEngine.playNote(note);
+            highlightKey(note, true);
+        }
+        
+        function handleNoteOff(note) {
+            if (pianoEngine) {
+                pianoEngine.stopNote(note);
+            }
+            highlightKey(note, false);
+        }
+        
+        function highlightKey(note, isActive) {
+            const keyElement = document.querySelector(`[data-note="${note}"]`);
+            if (keyElement) {
+                keyElement.classList.toggle('active', isActive);
+            }
+        }
+        
+        // Sistema de presets e efeitos
+        function toggleEffect(effect) {
+            const effectBtn = document.getElementById(`${effect}-btn`);
+            const isActive = activeEffects.includes(effect);
+            
+            if (isActive) {
+                activeEffects = activeEffects.filter(e => e !== effect);
+                effectBtn.classList.remove('active');
+            } else {
+                activeEffects.push(effect);
+                effectBtn.classList.add('active');
+            }
+            
+            updateStatusBar();
+        }
+        
+        function changePreset(preset) {
+            window.currentPreset = preset;
+            
+            // Parar todas as notas atuais
+            if (pianoEngine) {
+                pianoEngine.activeVoices.forEach((voice, note) => {
+                    pianoEngine.stopNote(note);
+                });
+            }
+            
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-preset="${preset}"]`).classList.add('active');
+            
+            updateStatusBar();
+        }
+        
+        function updateStatusBar() {
+            const effectsText = activeEffects.length > 0 ? activeEffects.join(', ') : 'Nenhum';
+            document.getElementById('status-bar').textContent = 
+                `Preset atual: ${getPresetDisplayName(window.currentPreset)} | Efeitos: ${effectsText} | Sensibilidade: Ativa`;
+        }
+        
+        function getPresetDisplayName(preset) {
+            const presetNames = {
+                'piano': 'Piano Acústico',
+                'epiano': 'Piano Elétrico',
+                'organ': 'Órgão',
+                'strings': 'Cordas',
+                'bass': 'Baixo'
+            };
+            return presetNames[preset] || preset;
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            pianoEngine = new AdvancedPianoEngine();
+            create67KeyKeyboard();
+            updateStatusBar();
+            
+            // Event listeners
+            document.getElementById('reverb-btn').addEventListener('click', () => toggleEffect('reverb'));
+            document.getElementById('chorus-btn').addEventListener('click', () => toggleEffect('chorus'));
+            document.getElementById('delay-btn').addEventListener('click', () => toggleEffect('delay'));
+            document.getElementById('tremolo-btn').addEventListener('click', () => toggleEffect('tremolo'));
+            
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => changePreset(btn.dataset.preset));
+            });
+            
+            // Controles de teclado
+            document.addEventListener('keydown', (e) => {
+                const key = e.key.toLowerCase();
+                
+                if (keyMap[key]) {
+                    handleNoteOn(keyMap[key]);
+                    e.preventDefault();
+                }
+                
+                if (e.key === 'Insert') {
+                    const presets = ['piano', 'epiano', 'organ', 'strings', 'bass'];
+                    const currentIndex = presets.indexOf(window.currentPreset);
+                    const nextIndex = (currentIndex + 1) % presets.length;
+                    changePreset(presets[nextIndex]);
+                    e.preventDefault();
+                }
+                
+                if (e.key === 'z' || e.key === 'x') {
+                    // Z/X para navegação, mas não tocar notas
+                    if (!keyMap[e.key]) {
+                        // Implementar navegação de oitavas se necessário
+                    }
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                const key = e.key.toLowerCase();
+                if (keyMap[key]) {
+                    handleNoteOff(keyMap[key]);
+                    e.preventDefault();
+                }
+            });
+            
+            // Iniciar áudio no primeiro clique
+            document.body.addEventListener('click', () => {
+                if (pianoEngine.audioContext && pianoEngine.audioContext.state === 'suspended') {
+                    pianoEngine.audioContext.resume();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

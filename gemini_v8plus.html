@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sintetizador Digital Avançado com Modo Split e Layer</title>
+    <!-- Tone.js v14.8.49: Versão estável que suporta todos os efeitos e synths -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <!-- Carrega Tailwind CSS para estilização responsiva e moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter como padrão e um fundo escuro */
+        body { font-family: 'Inter', sans-serif; background-color: #1a1a2e; color: #e0e0e0; }
+
+        /* Estilos Customizados do Piano */
+        .piano-key {
+            transition: background-color 0.05s ease, transform 0.05s ease, box-shadow 0.05s ease;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+
+        /* CHAVES BRANCAS */
+        .white-key {
+            width: 38px; 
+            height: 180px; 
+            background-color: #f0f0f0;
+            border: 1px solid #333;
+            border-top: none;
+            margin-right: -1px; /* Para as teclas se tocarem */
+            color: #333;
+        }
+
+        /* CHAVES PRETAS */
+        .black-key {
+            width: 24px; 
+            height: 120px; 
+            background-color: #333;
+            border: 1px solid #111;
+            margin-left: -12px;
+            margin-right: -12px;
+            z-index: 10;
+            color: #e0e0e0;
+            font-size: 0.75rem;
+        }
+
+        /* ESTADOS ATIVOS (TOQUE/PRESSIONADO) */
+        .key-active-main { 
+            background-color: #1D4ED8 !important; /* Azul escuro principal */
+            color: white !important;
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        }
+
+        .key-active-layer { 
+            background-color: #059669 !important; /* Verde camada */
+            color: white !important;
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        }
+        
+        /* ESTILO DIGITAL DISPLAY */
+        .digital-display {
+            font-family: monospace;
+            background-color: #0d1117;
+            border: 2px solid #2e8b57;
+            color: #2e8b57; /* Verde mar neon */
+            text-shadow: 0 0 5px #2e8b57;
+            box-shadow: inset 0 0 10px rgba(46, 139, 87, 0.5);
+        }
+
+        /* ESTILO DO FADER/KNOB */
+        .knob-control {
+            width: 50px;
+            height: 50px;
+            background: #2a2a44;
+            border-radius: 50%;
+            border: 3px solid #3d3d63;
+            position: relative;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), inset 0 0 5px rgba(255, 255, 255, 0.1);
+        }
+        .knob-control::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 15px;
+            background-color: #4CAF50; /* Indicador verde */
+            border-radius: 2px;
+            transition: transform 0.1s;
+        }
+        
+        /* ESTILO DE BOTÃO MODERNAS */
+        .mode-button {
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        }
+        .mode-button-active {
+            background-color: #10B981 !important; /* Verde neon */
+            color: #1a1a2e !important;
+            box-shadow: 0 0 10px #10B981, inset 0 0 5px #c3f2e3 !important;
+            transform: scale(1.05);
+        }
+
+        /* Slider para o Split Point */
+        input[type=range] {
+          -webkit-appearance: none;
+          width: 100%;
+          background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 24px;
+          width: 8px;
+          border-radius: 3px;
+          background: #3B82F6; /* Azul do Split Point */
+          cursor: pointer;
+          margin-top: -10px;
+          box-shadow: 0 0 5px #3B82F6;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 5px;
+          cursor: pointer;
+          background: #4B5563;
+          border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col min-h-screen">
+
+    <div id="app-container" class="w-full max-w-7xl mx-auto flex flex-col gap-6">
+        
+        <!-- ========================================================================= -->
+        <!-- PAINEL DE CONTROLE AVANÇADO (TOPO) -->
+        <!-- ========================================================================= -->
+        <div class="bg-gray-800 p-4 md:p-6 rounded-xl shadow-2xl border border-gray-700">
+            <h1 class="text-3xl font-extrabold text-teal-400 mb-6 text-center tracking-wider">GEMINI SYNTHESIS ENGINE</h1>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+                <!-- 1. DISPLAY DIGITAL (Status & Tecla) -->
+                <div class="lg:col-span-1 bg-gray-900 p-4 rounded-lg shadow-inner-lg">
+                    <div class="digital-display h-20 flex items-center justify-center p-2 rounded-md shadow-lg mb-4">
+                        <span id="display-status" class="text-xl md:text-2xl font-bold">CLIQUE PARA INICIAR O ÁUDIO</span>
+                    </div>
+                    <div id="mode-display" class="text-center font-bold text-lg p-2 rounded-md bg-gray-700 text-yellow-400">MODO: SINGLE</div>
+                </div>
+
+                <!-- 2. CONTROLES DE MODO -->
+                <div class="lg:col-span-1 flex flex-col justify-center gap-3">
+                    <label class="text-sm font-semibold text-gray-400 mb-1">MODO DE EXECUÇÃO</label>
+                    <button id="mode-single" class="mode-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg mode-button-active">1. SINGLE (Principal)</button>
+                    <button id="mode-layer" class="mode-button bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">2. LAYER (Principal + Camada)</button>
+                    <button id="mode-split" class="mode-button bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">3. SPLIT (Principal | Camada)</button>
+                </div>
+                
+                <!-- 3. CONTROLE DE VOLUME MESTRE E PAN -->
+                <div class="lg:col-span-2 flex flex-col md:flex-row justify-around gap-4 p-2 bg-gray-700 rounded-lg">
+                    <div class="flex flex-col items-center">
+                        <label class="text-xs font-medium text-gray-400 mb-2">VOLUME MESTRE</label>
+                        <div class="knob-control" id="knob-master-volume"></div>
+                        <span id="label-master-volume" class="text-xs text-gray-300 mt-1">100%</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <label class="text-xs font-medium text-gray-400 mb-2">PAN L/R</label>
+                        <div class="knob-control" id="knob-pan"></div>
+                        <span id="label-pan" class="text-xs text-gray-300 mt-1">CENTER</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <label class="text-xs font-medium text-gray-400 mb-2">VELOCITY</label>
+                        <div class="knob-control" id="knob-velocity"></div>
+                        <span id="label-velocity" class="text-xs text-gray-300 mt-1">100%</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- SEÇÃO DE PRESETS E SPLIT -->
+            <div class="mt-6 pt-6 border-t border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <!-- PRESET PRINCIPAL -->
+                <div class="bg-gray-700 p-4 rounded-lg shadow-xl border-l-4 border-blue-500">
+                    <label class="block text-sm font-bold text-blue-300 mb-2">PRESET PRINCIPAL (Synth 1)</label>
+                    <select id="select-preset-1" class="w-full p-2 rounded-md bg-gray-600 text-white border-none focus:ring-blue-500 focus:border-blue-500"></select>
+                </div>
+
+                <!-- PRESET CAMADA/SPLIT -->
+                <div class="bg-gray-700 p-4 rounded-lg shadow-xl border-l-4 border-green-500">
+                    <label class="block text-sm font-bold text-green-300 mb-2">PRESET CAMADA (Synth 2)</label>
+                    <select id="select-preset-2" class="w-full p-2 rounded-md bg-gray-600 text-white border-none focus:ring-green-500 focus:border-green-500"></select>
+                </div>
+
+                <!-- CONTROLE DE SPLIT POINT (Só visível no modo SPLIT) -->
+                <div id="split-control-panel" class="bg-gray-700 p-4 rounded-lg shadow-xl border-l-4 border-yellow-500 hidden md:col-span-1">
+                    <label class="block text-sm font-bold text-yellow-300 mb-4">PONTO DE DIVISÃO (SPLIT POINT)</label>
+                    <input type="range" id="split-point-slider" min="0" max="66" value="33" class="w-full">
+                    <div class="text-center mt-2">
+                        <span class="text-lg font-mono text-yellow-400" id="split-point-display">C5</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Synth 1 toca à esquerda, Synth 2 à direita do ponto.</p>
+                </div>
+                
+            </div>
+            
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- PIANO INTERATIVO (TECLADO) -->
+        <!-- ========================================================================= -->
+        <div class="flex-grow p-4 bg-gray-900 rounded-xl shadow-inner-2xl flex flex-col items-center justify-center">
+             <div id="piano-container" class="flex relative overflow-x-auto p-4 bg-gray-900 rounded-lg shadow-lg">
+                <!-- Teclas serão renderizadas aqui pelo JavaScript -->
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Use as teclas de A a L para as notas brancas e W, E, T, Y, U, O, P para as pretas.</p>
+        </div>
+        
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- LÓGICA JAVASCRIPT / TONE.JS -->
+    <!-- ========================================================================= -->
+    <script>
+        // Variáveis Globais
+        let synth1, synth2;
+        let masterVolume, masterPan, globalVelocity = 1.0;
+        let isReady = false;
+        const activeKeys = new Set(); // Para rastrear notas tocadas
+        const keysDown = new Set(); // Para rastrear teclas do teclado físico
+
+        const MODES = { SINGLE: 'SINGLE', LAYER: 'LAYER', SPLIT: 'SPLIT' };
+        let currentMode = MODES.SINGLE;
+        let splitIndex = 33; // Ponto de divisão padrão (C5)
+
+        // Mapeamento de Teclas (C2 a F#7)
+        const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const MIN_OCTAVE = 2;
+        const MAX_OCTAVE = 7;
+        const TOTAL_KEYS = 67; // C2 a F#7
+        const NOTES_MAP = []; // Irá conter todos os 'C2', 'C#2', ..., 'F#7'
+
+        // Mapeamento de Teclado Físico (QWERTY)
+        const KEY_MAP = {
+            'a': 'C3', 'w': 'C#3', 's': 'D3', 'e': 'D#3', 'd': 'E3', 'f': 'F3', 't': 'F#3', 'g': 'G3', 'y': 'G#3', 'h': 'A3', 'u': 'A#3', 'j': 'B3',
+            'k': 'C4', 'o': 'C#4', 'l': 'D4', 'p': 'D#4', ';': 'E4', "'": 'F4' // Exemplo de um range inicial
+        };
+
+        // =========================================================================
+        // PRESETS (MODELOS DE SINTETIZADORES)
+        // =========================================================================
+
+        const PRESETS = {
+            'Grand Piano (Default)': { 
+                type: 'Synth', 
+                options: { 
+                    oscillator: { type: 'sine' }, 
+                    envelope: { attack: 0.005, decay: 0.4, sustain: 0.5, release: 0.8 },
+                    volume: -8
+                }
+            },
+            'Electric Rhodes': { 
+                type: 'FMSynth', 
+                options: { 
+                    harmonicity: 3.01, 
+                    modulationIndex: 14, 
+                    envelope: { attack: 0.2, decay: 0.3, sustain: 0.1, release: 1.2 },
+                    modulationEnvelope: { attack: 0.3, decay: 0.01, sustain: 1, release: 0.5 },
+                    volume: -10
+                }
+            },
+            'Pad Strings': { 
+                type: 'AMSynth', 
+                options: { 
+                    harmonicity: 0.5, 
+                    oscillator: { type: 'sawtooth' }, 
+                    envelope: { attack: 2, decay: 0.5, sustain: 0.8, release: 3 },
+                    volume: -15
+                }
+            },
+            'Bass Sub': { 
+                type: 'MonoSynth', 
+                options: { 
+                    oscillator: { type: 'triangle' }, 
+                    envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.01 },
+                    filterEnvelope: { attack: 0.001, decay: 0.01, sustain: 0.5, release: 0.05, basePath: 200, octaves: 4 },
+                    volume: -5
+                }
+            }
+        };
+
+
+        // =========================================================================
+        // FUNÇÕES DE SETUP E INICIALIZAÇÃO
+        // =========================================================================
+
+        // Cria o mapa de notas (C2 a F#7)
+        function createNotesMap() {
+            let noteIndex = 0;
+            for (let octave = MIN_OCTAVE; octave <= MAX_OCTAVE; octave++) {
+                for (let i = 0; i < ALL_NOTES.length; i++) {
+                    const note = ALL_NOTES[i] + octave;
+                    NOTES_MAP.push(note);
+                    noteIndex++;
+                    // Para em F#7
+                    if (note === 'F#7') break;
+                }
+                if (noteIndex >= TOTAL_KEYS) break;
+            }
+        }
+
+        // Configura os Synths e os conecta ao Master Output
+        function setupSynths() {
+            // Volume e Pan Mestre
+            masterVolume = new Tone.Volume(0).toDestination();
+            masterPan = new Tone.Panner(0).connect(masterVolume);
+
+            // Cria o primeiro synth (Principal)
+            synth1 = new Tone.PolySynth().connect(masterPan);
+            
+            // Cria o segundo synth (Camada/Split)
+            synth2 = new Tone.PolySynth().connect(masterPan);
+
+            // Carrega os presets iniciais
+            setPreset('select-preset-1', Object.keys(PRESETS)[0]);
+            setPreset('select-preset-2', Object.keys(PRESETS)[1]);
+        }
+        
+        // Inicializa o Tone.js e o Audio Context
+        function initializeAudio() {
+            if (isReady) return;
+            setupSynths();
+            setupKnobs(); 
+            isReady = true;
+            document.getElementById('display-status').textContent = 'PRONTO';
+        }
+
+        // =========================================================================
+        // FUNÇÕES DE CONTROLE DE UI E MODO
+        // =========================================================================
+
+        // Atualiza o visor digital de status
+        function updateDisplay(status) {
+            document.getElementById('display-status').textContent = status;
+        }
+
+        // Altera o modo (Single/Layer/Split)
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('mode-display').textContent = `MODO: ${mode}`;
+            
+            // Atualiza os botões
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('mode-button-active'));
+            document.getElementById(`mode-${mode.toLowerCase()}`).classList.add('mode-button-active');
+
+            // Exibe/Esconde o controle de Split
+            const splitPanel = document.getElementById('split-control-panel');
+            if (mode === MODES.SPLIT) {
+                splitPanel.classList.remove('hidden');
+                updateSplitVisual();
+            } else {
+                splitPanel.classList.add('hidden');
+                // Limpa visualmente o split point no modo não-split
+                document.querySelectorAll('.piano-key').forEach(key => key.classList.remove('border-r-4', 'border-yellow-500'));
+            }
+        }
+        
+        // Configura a UI dos presets (dropdowns)
+        function setupPresetUI() {
+            const presetNames = Object.keys(PRESETS);
+            const select1 = document.getElementById('select-preset-1');
+            const select2 = document.getElementById('select-preset-2');
+
+            // Preenche os dropdowns
+            presetNames.forEach(name => {
+                const option1 = new Option(name, name);
+                const option2 = new Option(name, name);
+                select1.add(option1);
+                select2.add(option2);
+            });
+            
+            // Configura os eventos de mudança
+            select1.addEventListener('change', (e) => setPreset('select-preset-1', e.target.value));
+            select2.addEventListener('change', (e) => setPreset('select-preset-2', e.target.value));
+
+            // Garante que os valores iniciais sejam definidos
+            select1.value = presetNames[0];
+            select2.value = presetNames[1];
+        }
+
+        // Define o preset para um determinado synth
+        function setPreset(selectId, presetName) {
+            if (!isReady) return; 
+
+            const preset = PRESETS[presetName];
+            const targetSynth = selectId === 'select-preset-1' ? synth1 : synth2;
+            
+            // Remove o synth antigo e cria um novo do tipo correto
+            targetSynth.dispose(); 
+            
+            const SynthClass = Tone[preset.type] || Tone.PolySynth;
+            const newSynth = new SynthClass(preset.options).connect(masterPan);
+
+            if (selectId === 'select-preset-1') {
+                synth1 = newSynth;
+            } else {
+                synth2 = newSynth;
+            }
+            
+            updateDisplay(`PRESET ${selectId === 'select-preset-1' ? 'PRINCIPAL' : 'CAMADA'} CARREGADO: ${presetName}`);
+        }
+
+        // Renderiza o teclado
+        function renderPiano() {
+            createNotesMap();
+            const pianoContainer = document.getElementById('piano-container');
+            pianoContainer.innerHTML = '';
+            
+            NOTES_MAP.forEach((note, index) => {
+                const isSharp = note.includes('#');
+                const keyElement = document.createElement('div');
+                keyElement.className = `piano-key ${isSharp ? 'black-key' : 'white-key'}`;
+                keyElement.setAttribute('data-note', note);
+                keyElement.setAttribute('data-index', index);
+                
+                // Exibe a oitava e a nota para melhor visualização
+                keyElement.innerHTML = `<span class="text-xs absolute bottom-1">${note}</span>`;
+
+                // Eventos de Mouse
+                keyElement.addEventListener('mousedown', () => {
+                    if (Tone.context.state !== 'running') { Tone.start().then(initializeAudio); } else if (!isReady) { initializeAudio(); }
+                    playNote(note, index);
+                });
+                keyElement.addEventListener('mouseup', () => stopNote(note));
+                keyElement.addEventListener('mouseleave', () => stopNote(note));
+
+                // Eventos de Toque
+                keyElement.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (Tone.context.state !== 'running') { Tone.start().then(initializeAudio); } else if (!isReady) { initializeAudio(); }
+                    playNote(note, index);
+                }, { passive: false });
+                keyElement.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    stopNote(note);
+                });
+
+                pianoContainer.appendChild(keyElement);
+            });
+            
+            // Configura o Split Point inicial na UI
+            setSplitPoint(splitIndex);
+        }
+        
+        // Atualiza visualmente o ponto de divisão (Split Point)
+        function updateSplitVisual() {
+            document.querySelectorAll('.piano-key').forEach(key => key.classList.remove('border-r-4', 'border-yellow-500'));
+            
+            if (currentMode === MODES.SPLIT) {
+                const splitKeyElement = document.querySelector(`.piano-key[data-index="${splitIndex}"]`);
+                if (splitKeyElement) {
+                     // Adiciona uma borda amarela de split à TECLA ANTERIOR ao ponto de split
+                    const prevIndex = splitIndex - 1;
+                    const prevKeyElement = document.querySelector(`.piano-key[data-index="${prevIndex}"]`);
+                    if (prevKeyElement) {
+                         prevKeyElement.classList.add('border-r-4', 'border-yellow-500');
+                    }
+                }
+            }
+            document.getElementById('split-point-display').textContent = NOTES_MAP[splitIndex];
+        }
+
+
+        // =========================================================================
+        // FUNÇÕES DE ÁUDIO E EXECUÇÃO
+        // =========================================================================
+
+        function playNote(note, index) {
+            if (!isReady || activeKeys.has(note)) return;
+
+            activeKeys.add(note);
+            updateDisplay(`Tocando: ${note}`);
+
+            // 1. Determine qual synth(s) tocar
+            const useSynth1 = true;
+            let useSynth2 = false;
+            
+            if (currentMode === MODES.LAYER) {
+                useSynth2 = true;
+            } else if (currentMode === MODES.SPLIT) {
+                // index é o índice da nota no NOTES_MAP (0 a 66)
+                // Synth 1 (Principal) toca à esquerda (index < splitIndex)
+                // Synth 2 (Camada) toca à direita (index >= splitIndex)
+                if (index >= splitIndex) {
+                    // Se a nota está na seção da Camada/Split, o Synth 2 toca
+                    useSynth2 = true;
+                } else {
+                    // Se a nota está na seção Principal, apenas o Synth 1 toca
+                    useSynth2 = false; 
+                }
+            }
+            
+            // 2. Tocar a(s) nota(s) no(s) synth(s) apropriado(s)
+            if (useSynth1) {
+                synth1.triggerAttack(note, Tone.now(), globalVelocity);
+                // Adiciona a classe de ativação do Preset Principal (Azul)
+                document.querySelector(`.piano-key[data-note="${note}"]`)?.classList.add('key-active-main');
+            }
+            
+            if (useSynth2) {
+                synth2.triggerAttack(note, Tone.now(), globalVelocity * 0.7); // Volume ligeiramente menor para o layer
+                // Adiciona a classe de ativação do Preset Camada (Verde)
+                document.querySelector(`.piano-key[data-note="${note}"]`)?.classList.add('key-active-layer');
+            }
+        }
+
+        function stopNote(note) {
+            if (!activeKeys.has(note)) return;
+
+            // Para os synths
+            synth1.triggerRelease(note, Tone.now());
+            synth2.triggerRelease(note, Tone.now());
+
+            // Remove o estado ativo visual
+            const keyElement = document.querySelector(`.piano-key[data-note="${note}"]`);
+            keyElement?.classList.remove('key-active-main', 'key-active-layer');
+
+            activeKeys.delete(note);
+            if (activeKeys.size === 0) {
+                 updateDisplay('PRONTO');
+            }
+        }
+
+        // =========================================================================
+        // CONTROLES KNOB (INTERATIVOS)
+        // =========================================================================
+        
+        // Simula o controle de um Knob
+        function setupKnob(elementId, initialValue, min, max, labelId, effectSetter, format) {
+            const knob = document.getElementById(elementId);
+            let value = initialValue;
+            let isDragging = false;
+            let startY = 0;
+            let startValue = initialValue;
+            
+            // Função para atualizar o visual do indicador (simulando rotação)
+            function updateKnobRotation() {
+                // Mapeia o valor (0 a 1) para rotação (ex: -135deg a 135deg)
+                const rotation = ((value - min) / (max - min)) * 270 - 135;
+                const indicator = knob.querySelector('::after'); 
+                // Como não podemos manipular pseudo-elementos, usamos uma div interna para o indicador, 
+                // mas vamos apenas manipular o valor do CSS, o que é complexo.
+                // Para simplificar, vamos usar uma variável CSS ou apenas um atributo.
+                knob.style.setProperty('--rotation', `${rotation}deg`);
+            }
+            
+            // Adiciona um div para o indicador de rotação para podermos manipulá-lo
+            const indicatorDiv = document.createElement('div');
+            indicatorDiv.className = 'absolute top-0 left-1/2 w-1 h-3 bg-teal-400 rounded-full transform -translate-x-1/2 origin-bottom';
+            indicatorDiv.style.transform = `translateX(-50%) rotate(-135deg)`;
+            knob.appendChild(indicatorDiv);
+
+            knob.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startY = e.clientY;
+                startValue = value;
+                knob.classList.add('shadow-lg', 'ring-2', 'ring-teal-400');
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const deltaY = startY - e.clientY; // Movimento para cima aumenta o valor
+                let newValue = startValue + (deltaY * (max - min) / 200); // Sensibilidade de 200px
+                
+                newValue = Math.max(min, Math.min(max, newValue)); // Limita o valor
+                
+                // Arredonda para 2 casas decimais ou para um número inteiro
+                value = format === 'int' ? Math.round(newValue) : Math.round(newValue * 100) / 100;
+                
+                // Atualiza o efeito/variável
+                effectSetter(value);
+                
+                // Atualiza o display do rótulo
+                document.getElementById(labelId).textContent = formatValue(value, format);
+
+                // Atualiza o indicador visual
+                const rotation = ((value - min) / (max - min)) * 270 - 135;
+                indicatorDiv.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    knob.classList.remove('shadow-lg', 'ring-2', 'ring-teal-400');
+                }
+            });
+
+            // Configura o valor inicial
+            effectSetter(initialValue);
+            document.getElementById(labelId).textContent = formatValue(initialValue, format);
+            const rotation = ((initialValue - min) / (max - min)) * 270 - 135;
+            indicatorDiv.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+        }
+        
+        function formatValue(value, format) {
+             if (format === 'percent') return `${Math.round(value * 100)}%`;
+             if (format === 'pan') return value === 0 ? 'CENTER' : (value < 0 ? `L ${Math.abs(value * 100)}%` : `R ${value * 100}%`);
+             return value.toFixed(2);
+        }
+
+        // Configuração de todos os Knobs
+        function setupKnobs() {
+            // Knob de Volume Mestre (0 a 1)
+            setupKnob('knob-master-volume', 1.0, 0, 1.0, 'label-master-volume', (v) => {
+                // Tone.js usa decibéis (0 é 100%), então fazemos uma conversão logarítmica para -inf
+                masterVolume.volume.value = Tone.gainToDb(v);
+            }, 'percent');
+            
+            // Knob de Pan (Esquerda: -1, Direita: 1)
+            setupKnob('knob-pan', 0, -1.0, 1.0, 'label-pan', (v) => {
+                masterPan.pan.value = v;
+            }, 'pan');
+            
+            // Knob de Velocity Global (0.1 a 1.0)
+            setupKnob('knob-velocity', 1.0, 0.1, 1.0, 'label-velocity', (v) => {
+                globalVelocity = v;
+            }, 'percent');
+        }
+
+        // =========================================================================
+        // CONTROLE DE SPLIT POINT (Slider)
+        // =========================================================================
+
+        function setSplitPoint(index) {
+            splitIndex = parseInt(index);
+            updateSplitVisual();
+        }
+
+        // =========================================================================
+        // EVENT LISTENERS E INICIALIZAÇÃO GLOBAL
+        // =========================================================================
+        
+        // Eventos de Modo (Single/Layer/Split)
+        document.getElementById('mode-single').addEventListener('click', () => setMode(MODES.SINGLE));
+        document.getElementById('mode-layer').addEventListener('click', () => setMode(MODES.LAYER));
+        document.getElementById('mode-split').addEventListener('click', () => setMode(MODES.SPLIT));
+        
+        // Evento do Slider de Split Point
+        document.getElementById('split-point-slider').addEventListener('input', (e) => {
+            setSplitPoint(e.target.value);
+        });
+
+        // =========================================================================
+        // EVENTOS DE TECLADO FÍSICO
+        // =========================================================================
+        
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            if (note && !keysDown.has(key)) {
+                e.preventDefault();
+                // Garante que o áudio esteja pronto antes de tocar
+                if (Tone.context.state !== 'running') { Tone.start().then(initializeAudio); } else if (!isReady) { initializeAudio(); }
+                
+                keysDown.add(key);
+                
+                // Encontra o índice da nota para a lógica de split
+                const index = NOTES_MAP.indexOf(note);
+                if (index !== -1) {
+                    playNote(note, index);
+                } else {
+                    playNote(note); // Fallback para notas fora do range
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            if (note && keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.delete(key);
+                stopNote(note);
+            }
+        });
+
+        // =========================================================================
+        // Inicialização Global
+        // =========================================================================
+
+        // Inicia o contexto de áudio no primeiro clique no corpo do documento (necessário para navegadores)
+        document.body.addEventListener('click', () => {
+            if (Tone.context.state !== 'running') {
+                // A promessa só é resolvida quando o áudio é de fato iniciado
+                Tone.start().then(initializeAudio); 
+            } else if (!isReady) {
+                // Caso o start() tenha sido chamado por outro clique
+                initializeAudio();
+            }
+        }, { once: true });
+
+        // Inicialização: Renderiza a UI (sem áudio, que espera o clique)
+        window.onload = () => {
+            renderPiano();
+            setupPresetUI();
+            setMode(MODES.SINGLE); // Garante o modo SINGLE ativo no carregamento
+            // setupKnobs() e initializeAudio() são chamados apenas APÓS o primeiro clique para iniciar o áudio.
+        };
+
+    </script>
+</body>
+</html>

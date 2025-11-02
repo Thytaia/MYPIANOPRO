@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"/usr/share/xml/docbook/schema/dtd/4.4/docbookx.dtd" [
+<!ENTITY debian "Debian GNU/Linux">
+<!ENTITY dhprg  "<command>vmpk</command>">
+]>
+
+<!--**********************************************************************-->
+<!-- VMPK manpage                                                         -->
+<!--                                                                      -->
+<!-- Copyright (C) 2009 Mehdi Dogguy <dogguy@pps.jussieu.fr>              -->
+<!-- Copyright (C) 2010-2024 Pedro Lopez-Cabanillas <plcl@users.sf.net>   -->
+<!--                                                                      -->
+<!-- You have permission to copy, modify, and redistribute under the terms-->
+<!-- of the GNU GPL-3.0. For full license terms, see                      -->
+<!-- `/usr/share/common-licenses/GPL-3'.                                  -->
+<!--                                                                      -->
+<!--**********************************************************************-->
+
+<refentry>
+
+    <refentryinfo>
+        <author>
+            <firstname>Mehdi</firstname>
+            <surname>Dogguy</surname>
+            <email>dogguy@pps.jussieu.fr</email>
+            <personblurb><para></para></personblurb>
+        </author>
+        <copyright>
+            <year>2009</year>
+            <holder>Mehdi Dogguy</holder>
+        </copyright>
+        <author>
+            <firstname>Pedro</firstname>
+            <surname>Lopez-Cabanillas</surname>
+            <email>plcl@users.sourceforge.net</email>
+            <personblurb><para></para></personblurb>
+        </author>
+        <copyright>
+            <year>2010-2024</year>
+            <holder>Pedro Lopez-Cabanillas</holder>
+        </copyright>
+        <date>Dec 24, 2024</date>
+    </refentryinfo>
+
+    <refmeta>
+        <refentrytitle>vmpk</refentrytitle>
+        <manvolnum>1</manvolnum>
+        <refmiscinfo class="version">0.9.1</refmiscinfo>
+        <refmiscinfo class="software">vmpk</refmiscinfo>
+        <refmiscinfo class="manual">User Commands</refmiscinfo>
+    </refmeta>
+
+    <refnamediv>
+        <refname>&dhprg;</refname>
+        <refpurpose>Virtual MIDI Piano Keyboard</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv>
+        <cmdsynopsis>
+            &dhprg;
+            <arg choice="opt">options...</arg>
+        </cmdsynopsis>
+    </refsynopsisdiv>
+    <refsect1>
+        <title>DESCRIPTION</title>
+
+        <para>This manual page documents briefly the &dhprg; program.</para>
+
+        <para>This program uses standard Qt options.</para>
+
+        <para>Virtual MIDI Piano Keyboard is a MIDI events generator and
+            receiver. It doesn&apos;t produce any sound by itself, but can be used to
+            drive a MIDI synthesizer (either hardware or software, internal or
+            external). You can use the computer&apos;s keyboard to play MIDI notes,
+            and also the mouse. You can use the Virtual MIDI Piano Keyboard to
+            display the played MIDI notes from another instrument or MIDI file
+            player.
+        </para>
+    </refsect1>
+
+    <refsect1>
+        <title>vmpk Options</title>
+        <para>The following options apply to &dhprg; only:</para>
+        <variablelist>
+            <varlistentry>
+                <term><option>-h|--help</option></term>
+                <listitem><para>Displays a help text.</para></listitem>
+            </varlistentry>
+            <varlistentry>
+                <term><option>-v|--version</option></term>
+                <listitem><para>Displays version information.</para></listitem>
+            </varlistentry>
+            <varlistentry>
+                <term><option>-p|--portable</option></term>
+                <listitem><para>Enables portable settings mode using a default configuration file name.</para></listitem>
+            </varlistentry>
+            <varlistentry>
+                <term><option>-f</option>
+                    <replaceable>path/file.conf</replaceable></term>
+                <listitem>
+                    <para>This option implies <option>--portable</option> as well. Reads and writes
+                        <replaceable>path/file.conf</replaceable> as the portable settings configuration file
+                        name.</para>
+                    <para>This configuration file is always a text file with INI
+                        format, despite the running Operating System conventions.</para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1>
+        <title>Standard Options</title>
+        <para>The following options apply to all Qt5/6 applications:</para>
+        <variablelist>
+
+            <varlistentry>
+                <term>
+                    <option>-style=</option> <replaceable>style</replaceable> /
+                    <option>-style</option> <replaceable>style</replaceable>
+                </term>
+                <listitem><para>
+                        Set the application GUI style. Possible values depend on the system
+                        configuration.
+                        If Qt is compiled with additional styles or has additional styles as plugins
+                        these will be available to the <option>-style</option> command line
+                        option.</para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-stylesheet=</option> <replaceable>stylesheet</replaceable> /
+                    <option>-stylesheet</option> <replaceable>stylesheet</replaceable>
+                </term>
+                <listitem><para>
+                        Set the application styleSheet. The value must be a path to a file that contains
+                        the Style Sheet.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-widgetcount</option>
+                </term>
+                <listitem><para>
+                        Print debug message at the end about number of widgets left undestroyed and
+                        maximum number of widgets existed at the same time.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-reverse</option>
+                </term>
+                <listitem><para>
+                        Set the application's layout direction to
+                        <methodname>Qt::RightToLeft</methodname>.
+                        This option is intended to aid debugging and should not be used in production.
+                        The default value is automatically detected from the user's
+                        locale (see also <methodname>QLocale::textDirection()</methodname>).
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-platform</option> <replaceable>platformName[:options]</replaceable>
+                </term>
+                <listitem><para>
+                        Specify the Qt Platform Abstraction (QPA) plugin.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-platformpluginpath</option> <replaceable>path</replaceable>
+                </term>
+                <listitem><para>
+                        Specify the path to platform plugins.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-platformtheme</option> <replaceable>platformTheme</replaceable>
+                </term>
+                <listitem><para>
+                        Specify the platform theme.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-plugin</option> <replaceable>plugin</replaceable>
+                </term>
+                <listitem><para>
+                        Specify additional plugins to load. The argument may appear multiple times.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-qwindowgeometry</option> <replaceable>geometry</replaceable>
+                </term>
+                <listitem><para>
+                        Specify the window geometry for the main window using the X11-syntax. For
+                        example: -qwindowgeometry 100x100+50+50
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-qwindowicon</option> <replaceable>icon</replaceable>
+                </term>
+                <listitem><para>
+                        Set the default window icon.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-qwindowtitle</option> <replaceable>title</replaceable>
+                </term>
+                <listitem><para>
+                        Set the title of the first window.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-session</option> <replaceable>session</replaceable>
+                </term>
+                <listitem><para>
+                        Restore the application from an earlier session.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-display</option> <replaceable>hostname:screen_number</replaceable>
+                </term>
+                <listitem><para>
+                        Switch displays on X11. Overrides the <envar>DISPLAY</envar> environment
+                        variable.
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-geometry</option> <replaceable>geometry</replaceable>
+                </term>
+                <listitem><para>
+                        Specify the window geometry for the main window on X11. For example: -geometry
+                        100x100+50+50
+                        </para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-dialogs=</option> <replaceable>[xp|none]</replaceable>
+                </term>
+                <listitem><para>
+                        Only available for the Windows platform.
+                        XP uses native style dialogs and none disables them.</para></listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <option>-fontengine=</option> <replaceable>freetype</replaceable>
+                </term>
+                <listitem><para>
+                        Use the FreeType font engine.
+                        </para></listitem>
+            </varlistentry>
+
+        </variablelist>
+    </refsect1>
+
+    <refsect1>
+        <title>See Also</title>
+        <para>qt5options (7)</para>
+    </refsect1>
+
+    <refsect1>
+        <title>LICENSE</title>
+        <para>
+            This manual page was originally written by
+            <personname>
+                <firstname>Mehdi</firstname>
+                <surname>Dogguy</surname>
+            </personname>
+            <email>dogguy@pps.jussieu.fr</email>
+            for the Debian GNU/Linux system (but may be used by others).</para>
+        <para>Updated for Qt5/6 by
+            <personname>
+                <firstname>Pedro</firstname>
+                <surname>Lopez-Cabanillas</surname>
+            </personname>
+            <email>plcl@users.sourceforge.net</email>
+        </para>
+        <para>Permission is granted to copy, distribute and/or modify this document
+            under the terms of the <acronym>GNU</acronym> General Public
+            License, Version 3 or any later version published by the Free
+            Software Foundation; considering as source code all the file that
+            enable the production of this manpage.</para>
+    </refsect1>
+
+</refentry>

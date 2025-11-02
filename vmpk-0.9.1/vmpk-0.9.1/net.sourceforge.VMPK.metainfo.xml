@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2020-2024 VMPK Developers -->
+<component type="desktop-application">
+ <id>net.sourceforge.VMPK</id>
+ <metadata_license>CC0-1.0</metadata_license>
+ <project_license>GPL-3.0-or-later</project_license>
+ <name>VMPK</name>
+ <summary>Virtual MIDI Piano Keyboard: a MIDI events generator and receiver</summary>
+ <description>
+   <p>
+     Virtual MIDI Piano Keyboard is a MIDI events generator and
+     receiver. It doesn't produce any sound by itself, but can be used
+     to drive a MIDI synthesizer (either hardware or software,
+     internal or external). You can use the computer's keyboard to
+     play MIDI notes, and also the mouse. You can use the Virtual MIDI
+     Piano Keyboard to display the played MIDI notes from another
+     instrument or MIDI file player.
+   </p>
+ </description>
+ <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+ </recommends>
+ <screenshots>
+  <screenshot type="default">
+   <image>https://vmpk.sourceforge.io/images/VMPK_screenshot.png</image>
+   <caption>The VMPK window</caption>
+  </screenshot>
+ </screenshots>
+ <translation type="qt">vmpk</translation>
+ <content_rating type="oars-1.1" />
+ <launchable type="desktop-id">net.sourceforge.VMPK.desktop</launchable>
+ <url type="homepage">https://vmpk.sourceforge.io</url>
+ <url type="bugtracker">https://github.com/pedrolcl/VMPK/issues/</url>
+ <url type="translate">https://github.com/pedrolcl/VMPK/wiki/Translations</url>
+ <url type="vcs-browser">https://github.com/pedrolcl/VMPK/tree/master</url>
+ <url type="contact">https://sourceforge.net/projects/vmpk/lists/vmpk-devel</url>
+ <developer_name>Pedro López-Cabanillas</developer_name>
+ <update_contact>plcl_AT_users.sourceforge.net</update_contact>
+ <releases>
+   <release type="stable" version="0.9.1" date="2024-12-24"/>
+   <release type="stable" version="0.9.0" date="2023-12-30"/>
+ </releases>
+</component>

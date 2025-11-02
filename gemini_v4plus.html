@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Digital com Efeitos, Camada e Divisão (C2 a F#7)</title>
+    <!-- CORREÇÃO: Usando versão estável do Tone.js que tem todos os efeitos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <!-- Carrega Tailwind CSS para estilização responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos Customizados do Piano */
+        .piano-key {
+            transition: background-color 0.05s ease, transform 0.05s ease;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-weight: 500;
+        }
+
+        /* CHAVES BRANCAS: Dimensões ajustadas */
+        .white-key {
+            width: 30px; 
+            height: 150px; 
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-top: none; 
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+            margin-right: 1px;
+            z-index: 1;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+        }
+
+        /* CHAVES PRETAS: Dimensões ajustadas */
+        .black-key {
+            width: 18px; 
+            height: 90px; 
+            background-color: #1f2937;
+            border-radius: 0 0 3px 3px;
+            position: absolute;
+            top: 0;
+            left: -9px; 
+            z-index: 2;
+            color: white;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.8);
+            border: 1px solid #000;
+        }
+        
+        /* Estilo do texto dentro das teclas */
+        .key-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .white-key .note-label, .white-key .octave-label {
+            font-size: 0.6rem;
+            line-height: 0.8rem;
+            color: #4b5563;
+        }
+
+        /* Ajuste para teclas pretas: texto branco e centralizado na parte inferior */
+        .black-key .key-text {
+            color: #d1d5db; /* Cinza claro para sutileza */
+            bottom: 4px; 
+            font-size: 0.65rem;
+            line-height: 0.8rem;
+            font-weight: 400;
+        }
+        
+        .key-active.white-key {
+            background-color: #ffe0b2;
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+        }
+
+        .key-active.black-key {
+            background-color: #0d1218; 
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+        }
+
+        .octave-group {
+            display: flex;
+            margin-right: 2px;
+        }
+        .key-container {
+            position: relative;
+            flex-grow: 0; 
+        }
+        
+        /* Estilo Específico para o LCD */
+        .lcd-display {
+            background-color: #1d352b; 
+            color: #b8f1c4; 
+            font-family: 'monospace', 'Courier New', Courier;
+            border: 3px solid #0f172a;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.7);
+            padding: 8px 12px;
+        }
+
+        /* ESTILOS DO FADER (BARRA VERTICAL) */
+        .fader-track {
+            width: 8px; 
+            height: 100px; /* Altura do curso de movimento */
+            background-color: #374151;
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer; /* Adiciona cursor de clique na track */
+        }
+
+        .fader-handle {
+            width: 24px;
+            height: 12px;
+            background-color: #ef4444; /* Vermelho vibrante */
+            border-radius: 3px;
+            position: absolute;
+            left: -8px; 
+            cursor: ns-resize;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            transition: background-color 0.1s;
+            z-index: 10; /* Garante que o handle está acima da track */
+        }
+        
+        .fader-handle:hover {
+            background-color: #dc2626;
+        }
+
+        /* Estilo para Teclas de Split (Divisão) */
+        .split-left {
+            background-color: #fca5a5 !important; /* Cor de destaque para parte esquerda */
+        }
+        .split-right {
+            background-color: #90cdf4 !important; /* Cor de destaque para parte direita */
+        }
+        
+        /* Responsividade para telas menores */
+        @media (max-width: 640px) {
+            .white-key { width: 25px; height: 130px; }
+            .black-key { width: 15px; height: 75px; left: -7.5px; }
+            .octave-group { margin-right: 1px; }
+            .fader-track { height: 70px; }
+            .fader-handle { width: 20px; height: 10px; left: -6px; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- Overlay de Início de Áudio -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900/90 flex items-center justify-center z-50 transition-opacity duration-500">
+        <div class="text-xl font-semibold text-white p-6 bg-gray-800 rounded-lg shadow-2xl animate-pulse">
+            Clique em qualquer lugar para carregar os timbres e começar a tocar.
+        </div>
+    </div>
+
+    <!-- Container principal com largura aumentada -->
+    <div class="w-full max-w-[1400px] mx-auto p-4 bg-gray-200 rounded-xl shadow-2xl border-b-8 border-gray-400">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-4 text-center">
+            Piano Digital com Efeitos, Camada e Divisão (C2 a F#7)
+        </h1>
+        
+        <!-- PAINEL DE CONTROLE (MIXER/FADERS) -->
+        <div id="control-panel" class="mb-6 p-4 bg-gray-800 rounded-lg shadow-inner text-white flex flex-col space-y-4 md:space-y-0">
+            
+            <!-- Linha 1: Display, Timbre e Modo -->
+            <div class="flex flex-col md:flex-row justify-between items-center w-full mb-4 space-y-4 md:space-y-0">
+                <!-- LCD Display para Timbre Atual -->
+                <div class="w-full md:w-1/3 text-left">
+                    <p class="text-sm font-light text-gray-400 mb-1">Timbre Principal (Tocar/Camada Esquerda):</p>
+                    <div class="lcd-display rounded-lg">
+                        <p id="current-timbre-display" class="text-2xl font-mono font-bold whitespace-nowrap overflow-hidden">Carregando...</p>
+                    </div>
+                </div>
+
+                 <!-- Controles de Modo (Layer/Split) -->
+                 <div class="w-full md:w-1/3 text-center">
+                    <p class="text-sm font-light text-gray-400 mb-1">Modo de Teclado:</p>
+                    <div class="flex justify-center space-x-2">
+                        <button id="mode-single" class="mode-btn px-4 py-2 text-sm font-bold rounded-lg transition duration-150 bg-green-600 hover:bg-green-700 shadow-md">SINGLE</button>
+                        <button id="mode-layer" class="mode-btn px-4 py-2 text-sm font-bold rounded-lg transition duration-150 bg-gray-600 hover:bg-gray-700 shadow-md">LAYER</button>
+                        <button id="mode-split" class="mode-btn px-4 py-2 text-sm font-bold rounded-lg transition duration-150 bg-gray-600 hover:bg-gray-700 shadow-md">SPLIT (C4)</button>
+                    </div>
+                 </div>
+
+                 <!-- Instrução INSERT -->
+                <div class="w-full md:w-1/3 text-center md:text-right mt-4 md:mt-0">
+                    <p class="text-sm font-light text-gray-400">Trocar Timbre Principal (22 Presets):</p>
+                    <div class="flex items-center justify-center md:justify-end space-x-2 mt-1">
+                        <span class="text-lg font-bold bg-gray-700 py-1 px-3 rounded-md shadow-md">INSERT</span>
+                        <span class="text-base text-gray-400">próximo</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-lg font-bold text-gray-300 text-center border-b border-gray-700 pb-2">PROCESSAMENTO DE EFEITOS (9 FADERS)</p>
+            
+            <!-- Banco de Faders -->
+            <div class="flex justify-around items-end w-full p-2 bg-gray-900 rounded-lg">
+                
+                <!-- 1. DRIVE (Distorção) - Valor inicial 0.0 -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-drive" class="fader-track" data-effect="drive" data-value="0.0" data-min="0" data-max="0.8">
+                        <div class="fader-handle" style="bottom: 0%;"></div>
+                    </div>
+                    <p class="text-xs text-red-400 font-semibold">DRIVE</p>
+                </div>
+
+                <!-- NOVO: 2. FILTER (Low-Pass Filter) - Valor inicial 10000Hz -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-filter" class="fader-track" data-effect="filter" data-value="10000" data-min="200" data-max="10000">
+                        <div class="fader-handle" style="bottom: 100%;"></div>
+                    </div>
+                    <p class="text-xs text-orange-400 font-semibold">FILTER (LPF)</p>
+                </div>
+                
+                <!-- NOVO: 3. PANNER (Estéreo) - Valor inicial 0.0 (Centro) -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-panner" class="fader-track" data-effect="panner" data-value="0.0" data-min="-1" data-max="1">
+                        <div class="fader-handle" style="bottom: 50%;"></div>
+                    </div>
+                    <p class="text-xs text-cyan-400 font-semibold">PANNER</p>
+                </div>
+                
+                <!-- 4. TREMOLO (Modulação de Volume) - Valor inicial 0.0 -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-tremolo" class="fader-track" data-effect="tremolo" data-value="0.0" data-min="0" data-max="1">
+                        <div class="fader-handle" style="bottom: 0%;"></div>
+                    </div>
+                    <p class="text-xs text-yellow-400 font-semibold">TREMOLO</p>
+                </div>
+                
+                <!-- 5. CHORUS (Engrossar o Som) - Valor inicial 0.0 -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-chorus" class="fader-track" data-effect="chorus" data-value="0.0" data-min="0" data-max="1">
+                        <div class="fader-handle" style="bottom: 0%;"></div>
+                    </div>
+                    <p class="text-xs text-blue-400 font-semibold">CHORUS</p>
+                </div>
+                
+                <!-- 6. DELAY (Eco) - Valor inicial 0.0 -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-delay" class="fader-track" data-effect="delay" data-value="0.0" data-min="0" data-max="1">
+                        <div class="fader-handle" style="bottom: 0%;"></div>
+                    </div>
+                    <p class="text-xs text-green-400 font-semibold">DELAY</p>
+                </div>
+
+                <!-- 7. FLANGER (Avião/Varredura) - Valor inicial 0.0 -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-flanger" class="fader-track" data-effect="flanger" data-value="0.0" data-min="0" data-max="1">
+                        <div class="fader-handle" style="bottom: 0%;"></div>
+                    </div>
+                    <p class="text-xs text-purple-400 font-semibold">FLANGER</p>
+                </div>
+
+                <!-- 8. PHASER (Redemoinho Espectral) - Valor inicial 0.0 -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-phaser" class="fader-track" data-effect="phaser" data-value="0.0" data-min="0" data-max="1">
+                        <div class="fader-handle" style="bottom: 0%;"></div>
+                    </div>
+                    <p class="text-xs text-indigo-400 font-semibold">PHASER</p>
+                </div>
+
+                <!-- 9. REVERB (Ambiente/Sala) - Valor inicial 0.5 -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div id="fader-reverb" class="fader-track" data-effect="reverb" data-value="0.5" data-min="0" data-max="1">
+                        <div class="fader-handle" style="bottom: 50%;"></div>
+                    </div>
+                    <p class="text-xs text-pink-400 font-semibold">REVERB</p>
+                </div>
+                
+            </div>
+            
+        </div>
+        
+        <!-- Container do Piano -->
+        <div id="piano" class="flex justify-center p-2 bg-gray-900 rounded-lg shadow-inner border-b-4 border-gray-700 overflow-x-auto">
+            <!-- O Piano será renderizado aqui -->
+        </div>
+
+        <!-- Legenda do Mapeamento de Teclas -->
+        <div class="mt-8 p-4 bg-gray-50 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold text-gray-700 mb-3 text-center">Mapeamento de Teclado (PC)</h2>
+            <p class="text-center text-gray-600 text-sm">
+                **C3-B3 (Oitava Central):** (Linha inferior) Z, S, X, D, C, V, G, B, H, N, J, M | 
+                **C4-B4 (Mão Direita):** (Linha do meio) A, W, S, E, D, F, T, G, Y, H, U, J |
+                **C5-B5 (Agudo):** (Linha superior) K, O, L, P, ;, ', [, ], -, =, 0, \ 
+            </p>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- DADOS DO PIANO E TECLADO (C2 a F#7, 67 notas) ---
+        // Mapeamento de teclas físicas (QWERTY) para notas (C3-C6 é o foco de jogabilidade)
+        const KEY_TO_NOTE = {
+            // Oitava 3 (Z-M row) - 12 notes
+            'z': 'C3', 's': 'C#3', 'x': 'D3', 'd': 'D#3', 'c': 'E3', 'v': 'F3', 'g': 'F#3', 'b': 'G3', 'h': 'G#3', 'n': 'A3', 'j': 'A#3', 'm': 'B3',
+
+            // Oitava 4 (A-J row) - 12 notes
+            'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4', 'f': 'F4', 't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4', 'u': 'A#4', 'j': 'B4',
+
+            // Oitava 5 (K-symbols row) - 12 notes (adaptado para teclados brasileiros/europeus)
+            'k': 'C5', 'o': 'C#5', 'l': 'D5', 'p': 'D#5', ';': 'E5', '\'': 'F5', '[': 'F#5', ']' : 'G5', '-': 'G#5', '=': 'A5', '0': 'A#5', '\\': 'B5',
+            
+            // Oitava 6 (Numbers/Top Row) - 7 notes
+            '1': 'C6', 'q': 'C#6', '2': 'D6', 'r': 'D#6', '3': 'E6', 't': 'F6', '5': 'F#6'
+        };
+
+        // Estrutura das teclas para renderização da interface (C2 a F#7)
+        const NOTES_SEQUENCE = [
+            // C2 (12 notas)
+            { note: 'C2', key: 'C2', type: 'white', hasSharp: true }, { note: 'C#2', key: 'C#2', type: 'black' },
+            { note: 'D2', key: 'D2', type: 'white', hasSharp: true }, { note: 'D#2', key: 'D#2', type: 'black' },
+            { note: 'E2', key: 'E2', type: 'white', hasSharp: false },
+            { note: 'F2', key: 'F2', type: 'white', hasSharp: true }, { note: 'F#2', key: 'F#2', type: 'black' },
+            { note: 'G2', key: 'G2', type: 'white', hasSharp: true }, { note: 'G#2', key: 'G#2', type: 'black' },
+            { note: 'A2', key: 'A2', type: 'white', hasSharp: true }, { note: 'A#2', key: 'A#2', type: 'black' },
+            { note: 'B2', key: 'B2', type: 'white', hasSharp: false },
+            // C3 (12 notas)
+            { note: 'C3', key: 'Z', type: 'white', hasSharp: true }, { note: 'C#3', key: 'S', type: 'black' },
+            { note: 'D3', key: 'X', type: 'white', hasSharp: true }, { note: 'D#3', key: 'D', type: 'black' },
+            { note: 'E3', key: 'C', type: 'white', hasSharp: false },
+            { note: 'F3', key: 'V', type: 'white', hasSharp: true }, { note: 'F#3', key: 'G', type: 'black' },
+            { note: 'G3', key: 'B', type: 'white', hasSharp: true }, { note: 'G#3', key: 'H', type: 'black' },
+            { note: 'A3', key: 'N', type: 'white', hasSharp: true }, { note: 'A#3', key: 'J', type: 'black' },
+            { note: 'B3', key: 'M', type: 'white', hasSharp: false },
+            // C4 (12 notas) - Ponto de Split Padrão
+            { note: 'C4', key: 'A', type: 'white', hasSharp: true }, { note: 'C#4', key: 'W', type: 'black' },
+            { note: 'D4', key: 'S', type: 'white', hasSharp: true }, { note: 'D#4', key: 'E', type: 'black' },
+            { note: 'E4', key: 'D', type: 'white', hasSharp: false },
+            { note: 'F4', key: 'F', type: 'white', hasSharp: true }, { note: 'F#4', key: 'T', type: 'black' },
+            { note: 'G4', key: 'G', type: 'white', hasSharp: true }, { note: 'G#4', key: 'Y', type: 'black' },
+            { note: 'A4', key: 'H', type: 'white', hasSharp: true }, { note: 'A#4', key: 'U', type: 'black' },
+            { note: 'B4', key: 'J', type: 'white', hasSharp: false },
+            // C5 (12 notas)
+            { note: 'C5', key: 'K', type: 'white', hasSharp: true }, { note: 'C#5', key: 'O', type: 'black' },
+            { note: 'D5', key: 'L', type: 'white', hasSharp: true }, { note: 'D#5', key: 'P', type: 'black' },
+            { note: 'E5', key: ';', type: 'white', hasSharp: false },
+            { note: 'F5', key: "'", type: 'white', hasSharp: true }, { note: 'F#5', key: '[', type: 'black' },
+            { note: 'G5', key: ']', type: 'white', hasSharp: true }, { note: 'G#5', key: '-', type: 'black' },
+            { note: 'A5', key: '=', type: 'white', hasSharp: true }, { note: 'A#5', key: '0', type: 'black' },
+            { note: 'B5', key: '\\', type: 'white', hasSharp: false },
+             // C6 (12 notas)
+            { note: 'C6', key: '1', type: 'white', hasSharp: true }, { note: 'C#6', key: 'Q', type: 'black' },
+            { note: 'D6', key: '2', type: 'white', hasSharp: true }, { note: 'D#6', key: 'R', type: 'black' },
+            { note: 'E6', key: '3', type: 'white', hasSharp: false },
+            { note: 'F6', key: 'T', type: 'white', hasSharp: true }, { note: 'F#6', key: '5', type: 'black' },
+            { note: 'G6', key: 'G6', type: 'white', hasSharp: true }, { note: 'G#6', key: 'G#6', type: 'black' },
+            { note: 'A6', key: 'A6', type: 'white', hasSharp: true }, { note: 'A#6', key: 'A#6', type: 'black' },
+            { note: 'B6', key: 'B6', type: 'white', hasSharp: false },
+            // C7 (7 notas - Fim do 5.5 oitavas)
+            { note: 'C7', key: 'C7', type: 'white', hasSharp: true }, { note: 'C#7', key: 'C#7', type: 'black' },
+            { note: 'D7', key: 'D7', type: 'white', hasSharp: true }, { note: 'D#7', key: 'D#7', type: 'black' },
+            { note: 'E7', key: 'E7', type: 'white', hasSharp: false },
+            { note: 'F7', key: 'F7', type: 'white', hasSharp: true }, { note: 'F#7', key: 'F#7', type: 'black' }
+        ];
+
+        // --- DEFINIÇÃO DOS 22 TIMBRES (PRESETS) ---
+        const SYNTH_PRESETS = [
+            { name: "01. Piano de Cauda Quente", voice: Tone.PolySynth, settings: { oscillator: { type: "amsine", modulationType: "triangle", frequency: 2, volume: -5 }, envelope: { attack: 0.005, decay: 0.8, sustain: 0.1, release: 1.5 } } },
+            { name: "02. Rhodes Vintage", voice: Tone.PolySynth, settings: { oscillator: { type: "fmsine", modulationType: "square" }, envelope: { attack: 0.05, decay: 0.5, sustain: 0.2, release: 1.2 }, modulationIndex: 8, harmonicity: 0.5 } },
+            { name: "03. Wurli Eletromecânico", voice: Tone.PolySynth, settings: { oscillator: { type: "amtriangle", modulationType: "sine" }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.8 }, harmonicity: 2.5 } },
+            { name: "04. Órgão de Jazz B3", voice: Tone.PolySynth, settings: { oscillator: { type: "triangle" }, envelope: { attack: 0.05, decay: 0.9, sustain: 1.0, release: 0.1 }, volume: -2 } },
+            { name: "05. Cravo Barroco", voice: Tone.PolySynth, settings: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.2 }, volume: -4 } },
+            { name: "06. Pad Ambient Flutuante", voice: Tone.PolySynth, settings: { oscillator: { type: "sine" }, envelope: { attack: 2.0, decay: 1.5, sustain: 0.8, release: 4.0 }, volume: -8 } },
+            { name: "07. Lead Saw Gordinho", voice: Tone.PolySynth, settings: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.5, release: 1.0 }, detune: 5 } },
+            { name: "08. Baixo Moog Sólido", voice: Tone.PolySynth, settings: { oscillator: { type: "square" }, envelope: { attack: 0.005, decay: 0.4, sustain: 0.3, release: 0.1 }, volume: -5 } },
+            { name: "09. Arpeggio Pluck Curto", voice: Tone.PolySynth, settings: { oscillator: { type: "amtriangle" }, envelope: { attack: 0.002, decay: 0.1, sustain: 0, release: 0.15 } } },
+            { name: "10. Sino DX7 FM", voice: Tone.PolySynth, settings: { oscillator: { type: "fmsine" }, envelope: { attack: 0.001, decay: 1.2, sustain: 0, release: 1.0 }, modulationIndex: 30, harmonicity: 0.5 } },
+            { name: "11. Flauta de Madeira", voice: Tone.PolySynth, settings: { oscillator: { type: "sine" }, envelope: { attack: 0.15, decay: 0.3, sustain: 0.9, release: 1.5 }, volume: -4 } },
+            { name: "12. Brass Quente (Synth)", voice: Tone.PolySynth, settings: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.08, decay: 0.3, sustain: 0.5, release: 0.4 }, detune: -10 } },
+            { name: "13. Acordeão (Harmônica)", voice: Tone.PolySynth, settings: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.05, decay: 0.5, sustain: 0.8, release: 0.5 }, detune: 10 } },
+            { name: "14. Strings Clássicas (Pad)", voice: Tone.PolySynth, settings: { oscillator: { type: "triangle" }, envelope: { attack: 0.8, decay: 1.0, sustain: 0.9, release: 3.0 }, volume: -6 } },
+            { name: "15. Pincel Sonora (Swash)", voice: Tone.PolySynth, settings: { oscillator: { type: "square", volume: -10 }, envelope: { attack: 0.2, decay: 0.1, sustain: 0.7, release: 2.0 } } },
+            { name: "16. Ruído Clicável", voice: Tone.PolySynth, settings: { oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } } },
+            { name: "17. Onda Senoidal Pura", voice: Tone.PolySynth, settings: { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.4, release: 0.8 } } },
+            { name: "18. Square Wave 8-bit", voice: Tone.PolySynth, settings: { oscillator: { type: "square" }, envelope: { attack: 0.005, decay: 0.2, sustain: 0.5, release: 0.5 } } },
+            { name: "19. Steel Drum Caribenho", voice: Tone.PolySynth, settings: { oscillator: { type: "fmsine" }, envelope: { attack: 0.005, decay: 0.3, sustain: 0.1, release: 0.4 }, modulationIndex: 50, harmonicity: 0.5 } },
+            { name: "20. Toy Piano Percussivo", voice: Tone.PolySynth, settings: { oscillator: { type: "amtriangle" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.01, release: 0.2 } } },
+            { name: "21. Vibrafone Mellow", voice: Tone.PolySynth, settings: { oscillator: { type: "fmsine" }, envelope: { attack: 0.05, decay: 0.8, sustain: 0.01, release: 1.0 }, modulationIndex: 12, harmonicity: 0.8 } },
+            { name: "22. Sub Bass Profundo", voice: Tone.PolySynth, settings: { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.8, release: 0.5 }, volume: -10 } },
+        ];
+
+
+        // --- VARIÁVEIS GLOBAIS DE ÁUDIO E MODO DE TECLADO ---
+        let initializedSynths = [];
+        let currentTimbreIndex = 0; // Timbre Principal (Single/Left)
+        let currentSynth = null;
+        let isReady = false;
+        const activeKeys = new Set();
+        const NOTE_BY_KEY = {};
+        Object.keys(KEY_TO_NOTE).forEach(key => NOTE_BY_KEY[key] = KEY_TO_NOTE[key]);
+        
+        // Novos Modos
+        const MODES = { SINGLE: 'SINGLE', LAYER: 'LAYER', SPLIT: 'SPLIT' };
+        let currentMode = MODES.SINGLE;
+        const SPLIT_POINT = 'C4'; 
+
+        // Synths Adicionais para Layer e Split (usamos os presets 02 e 03 por padrão)
+        let layerSynth = null; 
+        let splitSynthLeft = null; 
+        let splitSynthRight = null;
+        
+        // Efeitos globais (Faders)
+        let masterDistortion = new Tone.Distortion(0.0).set({ wet: 1.0, distortion: 0.0 });
+        let masterFilter = new Tone.Filter(10000, "lowpass").set({ Q: 1.5, frequency: 10000 }); // Low-pass filter (LPF)
+        let masterPanner = new Tone.Panner(0).set({ pan: 0 }); // Stereo Panner
+        let masterTremolo = new Tone.Tremolo(9, 0.75).set({ wet: 0.0 }).start();
+        let masterChorus = new Tone.Chorus(4, 2.5, 0.5).set({ wet: 0.0 });
+        let masterDelay = new Tone.FeedbackDelay("8n", 0.5).set({ wet: 0.0 }); 
+        let masterFlanger = new Tone.Flanger({ frequency: 0.5, depth: 1, delay: 0.01 }).set({ wet: 0.0 }).start(); 
+        let masterPhaser = new Tone.Phaser({ frequency: 5, octaves: 3, Q: 10 }).set({ wet: 0.0 }).start();
+        let masterReverb = new Tone.Reverb({ decay: 3, wet: 0.5 }).set({ wet: 0.5 }); 
+
+        // Cadeia de Efeitos: Synth -> Drive -> Filter -> Panner -> Tremolo -> Chorus -> Delay -> Flanger -> Phaser -> Reverb -> Master
+        masterDistortion.connect(masterFilter);
+        masterFilter.connect(masterPanner);
+        masterPanner.connect(masterTremolo);
+        masterTremolo.connect(masterChorus);
+        masterChorus.connect(masterDelay);
+        masterDelay.connect(masterFlanger);
+        masterFlanger.connect(masterPhaser);
+        masterPhaser.connect(masterReverb);
+        masterReverb.connect(Tone.Master);
+
+
+        /**
+         * Inicializa a cadeia de áudio e todos os presets.
+         */
+        function initializeAudio() {
+            if (isReady) return;
+
+            // 1. Inicializa todos os Synths
+            initializedSynths = SYNTH_PRESETS.map(preset => {
+                const SynthType = preset.voice || Tone.PolySynth;
+                let synth = new SynthType(Tone.Synth, preset.settings);
+
+                // Conecta todos os synths ao início da cadeia de efeitos (Distortion)
+                synth.connect(masterDistortion);
+                synth.volume.value = -Infinity; // Muta inicialmente
+                return synth;
+            });
+
+            // 2. Define os Synths de Trabalho
+            currentSynth = initializedSynths[0]; // Piano de Cauda Quente
+            currentSynth.volume.value = 0; 
+            
+            layerSynth = initializedSynths[1]; // Rhodes Vintage (para Camada)
+            splitSynthLeft = initializedSynths[0]; // Piano de Cauda Quente (para Esquerda)
+            splitSynthRight = initializedSynths[2]; // Wurli Eletromecânico (para Direita)
+
+            isReady = true;
+            console.log("Sistema de Áudio e 22 Timbres Inicializados.");
+            document.getElementById('loading-overlay').classList.add('opacity-0', 'pointer-events-none');
+            
+            // Atualiza o painel, faders e UI de modo
+            updateModeUI();
+            updateControlPanel();
+            updateFaderVisuals();
+        }
+        
+        /**
+         * Atualiza os estilos de tecla para o modo Split.
+         */
+        function updateSplitKeyStyles() {
+            const splitMidi = Tone.Midi(SPLIT_POINT).toMidi();
+
+            document.querySelectorAll('.piano-key').forEach(key => {
+                const note = key.getAttribute('data-note');
+                if (!note) return;
+                
+                // Limpa classes
+                key.classList.remove('split-left', 'split-right');
+                
+                if (currentMode === MODES.SPLIT) {
+                    // Aplica cores de acordo com o ponto de divisão
+                    if (Tone.Midi(note).toMidi() < splitMidi) {
+                        key.classList.add('split-left');
+                    } else {
+                        key.classList.add('split-right');
+                    }
+                }
+            });
+        }
+        
+        /**
+         * Altera o modo de teclado (Single, Layer, Split).
+         */
+        function setMode(mode) {
+            if (currentMode === mode) return;
+
+            // 1. Desliga todos os synths de modo não-principal
+            initializedSynths.forEach(synth => {
+                 if (synth !== currentSynth) {
+                    synth.volume.value = -Infinity;
+                 }
+            });
+
+            // 2. Atualiza o modo
+            currentMode = mode;
+            
+            // 3. Atualiza os volumes dos synths de trabalho
+            if (currentMode === MODES.LAYER) {
+                layerSynth.volume.value = 0; // Liga camada
+            } else {
+                layerSynth.volume.value = -Infinity;
+            }
+            
+            // 4. Garante que o timbre principal está ligado no modo Single/Layer
+            if (currentMode === MODES.SINGLE || currentMode === MODES.LAYER) {
+                currentSynth.volume.value = 0;
+            }
+            
+            // No modo SPLIT, os volumes dos synths de Split são controlados
+            // A lógica de volume para SPLIT será tratada em playNote
+            
+            updateModeUI();
+            updateSplitKeyStyles();
+        }
+        
+        /**
+         * Atualiza a UI para o modo de teclado atual.
+         */
+        function updateModeUI() {
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+            });
+
+            const activeBtn = document.getElementById(`mode-${currentMode.toLowerCase()}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+                activeBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
+            
+            // Atualiza o display LCD no modo SPLIT para refletir o timbre duplo
+            const displayElement = document.getElementById('current-timbre-display');
+            if (currentMode === MODES.SPLIT) {
+                 const leftName = SYNTH_PRESETS[initializedSynths.indexOf(splitSynthLeft)].name.split('. ')[1];
+                 const rightName = SYNTH_PRESETS[initializedSynths.indexOf(splitSynthRight)].name.split('. ')[1];
+                 displayElement.textContent = `SPLIT: Esquerda(${leftName}) | Direita(${rightName})`;
+            } else {
+                 updateControlPanel();
+            }
+        }
+        
+        /**
+         * Toca uma nota e aplica o estilo ativo.
+         */
+        function playNote(note) {
+            if (!isReady || activeKeys.has(note)) return;
+            
+            // 1. Determina quais synths tocar
+            let synthsToPlay = [];
+
+            if (currentMode === MODES.SPLIT) {
+                const splitMidi = Tone.Midi(SPLIT_POINT).toMidi();
+                const noteMidi = Tone.Midi(note).toMidi();
+                
+                // Muta todos exceto os synths de Split (para evitar ruído)
+                initializedSynths.forEach(synth => synth.volume.value = -Infinity);
+                
+                if (noteMidi < splitMidi) {
+                    synthsToPlay.push(splitSynthLeft);
+                } else {
+                    synthsToPlay.push(splitSynthRight);
+                }
+                
+                // Garante que os synths de Split estão ligados
+                splitSynthLeft.volume.value = 0;
+                splitSynthRight.volume.value = 0;
+
+            } else {
+                // Modo Single ou Layer
+                synthsToPlay.push(currentSynth);
+                if (currentMode === MODES.LAYER && layerSynth) {
+                    synthsToPlay.push(layerSynth); 
+                }
+            }
+
+            // 2. Trigger notes
+            if (synthsToPlay.length === 0) return;
+
+            try {
+                synthsToPlay.forEach(synth => {
+                    synth.triggerAttack(note);
+                });
+                activeKeys.add(note);
+
+                const keyElement = document.querySelector(`[data-note="${note}"]`);
+                if (keyElement) {
+                    keyElement.classList.add('key-active');
+                }
+            } catch (e) {
+                console.error("Erro ao tocar nota:", e);
+            }
+        }
+
+        /**
+         * Para uma nota e remove o estilo ativo.
+         */
+        function stopNote(note) {
+            if (!isReady) return;
+
+            // Determine quais synths parar (deve ser o mesmo da playNote)
+            let synthsToStop = [];
+            
+            if (currentMode === MODES.SPLIT) {
+                const splitMidi = Tone.Midi(SPLIT_POINT).toMidi();
+                const noteMidi = Tone.Midi(note).toMidi();
+                
+                if (noteMidi < splitMidi) {
+                    synthsToStop.push(splitSynthLeft);
+                } else {
+                    synthsToStop.push(splitSynthRight);
+                }
+            } else {
+                synthsToStop.push(currentSynth);
+                if (currentMode === MODES.LAYER && layerSynth) {
+                    synthsToStop.push(layerSynth);
+                }
+            }
+            
+            if (synthsToStop.length === 0) return;
+
+            try {
+                synthsToStop.forEach(synth => {
+                    // Só solta a nota, não muta o synth inteiro
+                    synth.triggerRelease(note);
+                });
+                
+                activeKeys.delete(note);
+
+                const keyElement = document.querySelector(`[data-note="${note}"]`);
+                if (keyElement) {
+                    keyElement.classList.remove('key-active');
+                }
+            } catch (e) {
+                console.error("Erro ao parar nota:", e);
+            }
+        }
+
+        /**
+         * Alterna para o próximo timbre principal na lista.
+         */
+        function changeTimbre(direction) {
+            if (!isReady) return;
+
+            // 1. Muta o timbre principal atual
+            if (currentSynth) {
+                currentSynth.volume.value = -Infinity; 
+            }
+
+            // 2. Calcula novo índice
+            currentTimbreIndex += direction;
+            if (currentTimbreIndex >= SYNTH_PRESETS.length) {
+                currentTimbreIndex = 0;
+            } else if (currentTimbreIndex < 0) {
+                currentTimbreIndex = SYNTH_PRESETS.length - 1;
+            }
+
+            // 3. Define novo synth principal e liga (a menos que esteja no modo SPLIT)
+            currentSynth = initializedSynths[currentTimbreIndex];
+            if (currentMode !== MODES.SPLIT) {
+                currentSynth.volume.value = 0;
+            }
+            
+            // 4. Re-atribui synths de modo Layer/Split (mantendo o índice 1 e 2 como Layer/Split Right por simplicidade)
+            // Lembre-se: layerSynth e splitSynthRight são fixos em 02 e 03 por simplicidade
+            // currentSynth (índice 0) é sempre o principal/esquerda
+            splitSynthLeft = currentSynth;
+            
+            updateControlPanel();
+            updateModeUI(); // Atualiza display para SPLIT/SINGLE/LAYER
+        }
+        
+        /**
+         * Atualiza o painel visual com o nome do timbre e índice.
+         */
+        function updateControlPanel() {
+            const displayElement = document.getElementById('current-timbre-display');
+            if (displayElement) {
+                const preset = SYNTH_PRESETS[currentTimbreIndex];
+                const presetName = `${preset.name}`.padEnd(30, ' ');
+                displayElement.textContent = presetName.substring(0, 30);
+            }
+        }
+
+        /**
+         * Constrói o elemento HTML de uma tecla do piano. 
+         */
+        function createKeyElement(keyData) {
+            // ... (Função de renderização da interface é mantida, sem alterações lógicas aqui) ...
+            const isWhite = keyData.type === 'white';
+            const element = document.createElement('div');
+            element.classList.add('piano-key');
+            element.classList.add(isWhite ? 'white-key' : 'black-key');
+            element.setAttribute('data-note', keyData.note);
+            
+            const mappedKey = KEY_TO_NOTE[keyData.key.toLowerCase()];
+            if(mappedKey) {
+                element.setAttribute('data-key', keyData.key.toLowerCase());
+            }
+
+            const keyTextContainer = document.createElement('div');
+            keyTextContainer.classList.add('key-text', 'absolute', 'w-full');
+            
+            keyTextContainer.classList.add(isWhite ? 'bottom-2' : 'bottom-1');
+
+            const noteLabel = document.createElement('div');
+            noteLabel.classList.add('note-label', 'text-xs', 'font-bold');
+            noteLabel.textContent = keyData.note.replace(/[0-9]/g, ''); 
+            
+            const octaveLabel = document.createElement('div');
+            octaveLabel.classList.add('octave-label', 'text-xs');
+            octaveLabel.textContent = keyData.note.replace(/[^0-9]/g, ''); 
+            
+            const keyLabel = document.createElement('div');
+            keyLabel.classList.add('key-label', 'font-extrabold', 'text-xs');
+            keyLabel.textContent = mappedKey ? keyData.key.toUpperCase() : ''; 
+            
+            if (isWhite) {
+                 keyTextContainer.appendChild(keyLabel);
+                 keyTextContainer.appendChild(noteLabel);
+                 keyTextContainer.appendChild(octaveLabel);
+            } else {
+                 // Teclas pretas mostram a cifra completa
+                 keyTextContainer.appendChild(noteLabel);
+                 keyTextContainer.appendChild(octaveLabel);
+                 if (mappedKey) {
+                     keyTextContainer.appendChild(keyLabel);
+                 }
+            }
+            
+            element.appendChild(keyTextContainer);
+            
+            if (!isWhite) {
+                 return element;
+            }
+
+            const keyContainer = document.createElement('div');
+            keyContainer.classList.add('key-container');
+            keyContainer.appendChild(element);
+            return keyContainer;
+        }
+
+        /**
+         * Renderiza o piano completo no DOM. 
+         */
+        function renderPiano() {
+            // ... (Função de renderização da interface é mantida, sem alterações lógicas aqui) ...
+            const pianoContainer = document.getElementById('piano');
+            if (!pianoContainer) return;
+            
+            pianoContainer.innerHTML = '';
+            let currentOctaveGroup = null;
+            let currentOctave = 2;
+
+            NOTES_SEQUENCE.forEach((keyData, index) => {
+                const octaveMatch = keyData.note.match(/(\d)/);
+                const currentNoteOctave = octaveMatch ? parseInt(octaveMatch[1]) : 2;
+
+                if (currentNoteOctave !== currentOctave || keyData.note.startsWith('C')) {
+                    if (currentOctaveGroup) {
+                        pianoContainer.appendChild(currentOctaveGroup);
+                    }
+                    currentOctaveGroup = document.createElement('div');
+                    currentOctaveGroup.classList.add('octave-group', 'flex');
+                    currentOctave = currentNoteOctave;
+                }
+                
+                const isWhite = keyData.type === 'white';
+
+                if (isWhite) {
+                    const whiteKeyContainer = createKeyElement(keyData); 
+
+                    if (keyData.hasSharp && NOTES_SEQUENCE[index + 1] && NOTES_SEQUENCE[index + 1].type === 'black') {
+                        const blackKeyData = NOTES_SEQUENCE[index + 1];
+                        const blackKeyElement = createKeyElement(blackKeyData); 
+                        
+                        blackKeyElement.style.position = 'absolute';
+                        blackKeyElement.style.top = '0';
+                        blackKeyElement.style.left = '-9px'; 
+                        blackKeyElement.style.zIndex = '2';
+
+                        whiteKeyContainer.appendChild(blackKeyElement); 
+                    }
+
+                    if (currentOctaveGroup) {
+                        currentOctaveGroup.appendChild(whiteKeyContainer);
+                    }
+                }
+            });
+
+            if (currentOctaveGroup) {
+                pianoContainer.appendChild(currentOctaveGroup);
+            }
+        }
+        
+        /**
+         * Mapeia a posição do mouse/toque no fader para um valor entre min/max.
+         */
+        function mapYToValue(rect, mouseY, minVal, maxVal) {
+            // 1. Calcula a posição normalizada (0 no fundo, 1 no topo)
+            let normalizedY = 1 - ((mouseY - rect.top) / rect.height);
+            normalizedY = Math.max(0, Math.min(1, normalizedY)); // Limita entre 0 e 1
+            
+            // 2. Mapeia para o intervalo de valores (min a max)
+            return minVal + normalizedY * (maxVal - minVal);
+        }
+
+        /**
+         * Controla a lógica de arraste do Fader vertical.
+         */
+        function setupFaderControl(faderTrack, effect, initialValue) {
+            const faderHandle = faderTrack.querySelector('.fader-handle');
+            let isDragging = false;
+            const minVal = parseFloat(faderTrack.getAttribute('data-min'));
+            const maxVal = parseFloat(faderTrack.getAttribute('data-max'));
+            let currentValue = initialValue;
+            
+            // Função interna para atualizar a posição visual do handle
+            const updateHandlePosition = (value) => {
+                const range = maxVal - minVal;
+                // Valor normalizado (0 a 1)
+                const normalized = (value - minVal) / range;
+                // Posiciona o handle do 0% (bottom) ao 100% (top)
+                const percent = Math.max(0, Math.min(100, normalized * 100)); 
+                faderHandle.style.bottom = `${percent}%`;
+            };
+
+            // Função interna para atualizar o efeito de áudio
+            const updateEffect = (newValue) => {
+                newValue = Math.max(minVal, Math.min(maxVal, newValue));
+                currentValue = parseFloat(newValue.toFixed(3));
+                
+                switch (effect) {
+                    case 'reverb':
+                        masterReverb.set({ wet: currentValue });
+                        break;
+                    case 'chorus':
+                        masterChorus.set({ wet: currentValue });
+                        break;
+                    case 'tremolo':
+                        masterTremolo.set({ wet: currentValue });
+                        break;
+                    case 'drive':
+                        // Controla o nível de distorção (0 a 0.8)
+                        masterDistortion.set({ distortion: currentValue }); 
+                        break;
+                    case 'delay':
+                        masterDelay.set({ wet: currentValue });
+                        break;
+                    case 'flanger':
+                        masterFlanger.set({ wet: currentValue });
+                        break;
+                    case 'phaser':
+                        masterPhaser.set({ wet: currentValue });
+                        break;
+                    case 'filter':
+                        // Controla a frequência de corte do filtro (200 a 10000 Hz)
+                        masterFilter.set({ frequency: currentValue });
+                        break;
+                    case 'panner':
+                        // Controla o estéreo pan (-1.0 esq. a 1.0 dir.)
+                        masterPanner.set({ pan: currentValue });
+                        break;
+                }
+                
+                updateHandlePosition(currentValue);
+                faderTrack.setAttribute('data-value', currentValue);
+            };
+
+            // Inicializa a posição do handle
+            updateHandlePosition(currentValue);
+
+            const startDrag = (e) => {
+                if (e.button !== 0 && !e.touches) return; // Só aceita clique esquerdo ou toque
+                e.preventDefault();
+                isDragging = true;
+                faderHandle.style.cursor = 'grabbing';
+            };
+
+            const doDrag = (e) => {
+                if (!isDragging) return;
+                
+                const rect = faderTrack.getBoundingClientRect();
+                const mouseY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                
+                let newValue = mapYToValue(rect, mouseY, minVal, maxVal);
+
+                updateEffect(newValue);
+            };
+
+            const endDrag = () => {
+                if (isDragging) {
+                    isDragging = false;
+                    faderHandle.style.cursor = 'ns-resize';
+                }
+            };
+            
+            // Eventos do Handle
+            faderHandle.addEventListener('mousedown', startDrag);
+            faderHandle.addEventListener('touchstart', startDrag, { passive: false });
+            
+            // Eventos Globais
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchmove', doDrag, { passive: false });
+            document.addEventListener('touchend', endDrag);
+            document.addEventListener('touchcancel', endDrag);
+            
+
+            // Permite clicar na track para mover o handle
+            faderTrack.addEventListener('click', (e) => {
+                 if (e.target.closest('.fader-handle')) return; 
+
+                 const rect = faderTrack.getBoundingClientRect();
+                 const mouseY = e.clientY;
+                 
+                 let newValue = mapYToValue(rect, mouseY, minVal, maxVal);
+                 updateEffect(newValue);
+            });
+        }
+
+        /**
+         * Configura todos os faders.
+         */
+        function setupAllFaders() {
+            // DRIVER: Distortion
+            setupFaderControl(document.getElementById('fader-drive'), 'drive', masterDistortion.distortion.value);
+            // FILTER: Lowpass
+            setupFaderControl(document.getElementById('fader-filter'), 'filter', masterFilter.frequency.value);
+            // PANNER: Stereo
+            setupFaderControl(document.getElementById('fader-panner'), 'panner', masterPanner.pan.value);
+            // MODULAÇÃO: Tremolo
+            setupFaderControl(document.getElementById('fader-tremolo'), 'tremolo', masterTremolo.wet.value);
+            // MODULAÇÃO: Chorus
+            setupFaderControl(document.getElementById('fader-chorus'), 'chorus', masterChorus.wet.value);
+            // TEMPO: Delay
+            setupFaderControl(document.getElementById('fader-delay'), 'delay', masterDelay.wet.value);
+            // TEMPO: Flanger
+            setupFaderControl(document.getElementById('fader-flanger'), 'flanger', masterFlanger.wet.value);
+            // TEMPO: Phaser
+            setupFaderControl(document.getElementById('fader-phaser'), 'phaser', masterPhaser.wet.value);
+            // AMBIENTE: Reverb
+            setupFaderControl(document.getElementById('fader-reverb'), 'reverb', masterReverb.wet.value);
+        }
+
+        /**
+         * Atualiza a posição visual de todos os faders ao iniciar.
+         */
+        function updateFaderVisuals() {
+             setupAllFaders();
+        }
+
+        // --- Eventos de Interação ---
+
+        // Evento de pressionar tecla
+        document.addEventListener('keydown', (event) => {
+            const key = event.key.toLowerCase();
+            const note = KEY_TO_NOTE[key];
+
+            if (note && !event.repeat) {
+                if (key === ' ' && event.target === document.body) {
+                    event.preventDefault(); 
+                }
+                playNote(note);
+            } else if ((event.key === 'Insert' || event.keyCode === 45) && !event.repeat) {
+                changeTimbre(1);
+            }
+        });
+
+        // Evento de soltar tecla
+        document.addEventListener('keyup', (event) => {
+            const key = event.key.toLowerCase();
+            const note = KEY_TO_NOTE[key];
+
+            if (note) {
+                stopNote(note);
+            }
+        });
+
+        // Eventos de mouse (clique/toque)
+        const pianoElement = document.getElementById('piano');
+        let notePlayedByMouse = null; 
+
+        if (pianoElement) {
+             pianoElement.addEventListener('mousedown', (event) => {
+                // Inicia o áudio na primeira interação
+                if (Tone.context.state !== 'running') {
+                    Tone.start().then(initializeAudio);
+                } else if (!isReady) {
+                    initializeAudio();
+                }
+
+                const keyElement = event.target.closest('.piano-key');
+                if (keyElement) {
+                    const note = keyElement.getAttribute('data-note');
+                    playNote(note);
+                    notePlayedByMouse = note; 
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (notePlayedByMouse) {
+                    stopNote(notePlayedByMouse);
+                    notePlayedByMouse = null;
+                }
+            });
+            
+            pianoElement.addEventListener('mouseleave', () => {
+                if (notePlayedByMouse) {
+                    stopNote(notePlayedByMouse);
+                    notePlayedByMouse = null;
+                }
+            });
+
+            // Adiciona suporte a toque
+            pianoElement.addEventListener('touchstart', (event) => {
+                event.preventDefault(); 
+                if (Tone.context.state !== 'running') {
+                    Tone.start().then(initializeAudio);
+                } else if (!isReady) {
+                    initializeAudio();
+                }
+                
+                Array.from(event.touches).forEach(touch => {
+                    const keyElement = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.piano-key');
+                    if (keyElement) {
+                        const note = keyElement.getAttribute('data-note');
+                        playNote(note);
+                    }
+                });
+            }, { passive: false });
+
+            pianoElement.addEventListener('touchend', (event) => {
+                event.preventDefault();
+                // Parar todas as notas ativas no final do toque, já que 'touchmove' não é fácil de rastrear
+                activeKeys.forEach(note => stopNote(note));
+            });
+        }
+        
+        // Eventos de Modo (Single/Layer/Split)
+        document.getElementById('mode-single').addEventListener('click', () => setMode(MODES.SINGLE));
+        document.getElementById('mode-layer').addEventListener('click', () => setMode(MODES.LAYER));
+        document.getElementById('mode-split').addEventListener('click', () => setMode(MODES.SPLIT));
+
+        // Inicia o contexto de áudio no primeiro clique no corpo do documento (fallback)
+        document.body.addEventListener('click', () => {
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(initializeAudio); 
+            } else if (!isReady) {
+                initializeAudio();
+            }
+        }, { once: true });
+
+
+        // Inicialização: Renderiza a UI do piano e configura faders
+        window.onload = () => {
+            renderPiano();
+            setupAllFaders(); 
+        };
+    </script>
+</body>
+</html>

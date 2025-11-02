@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Digital Avançado - Piano Gemini</title>
+    <!-- Tone.js v14.8.49: Versão estável que suporta todos os efeitos e synths -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <!-- Carrega Tailwind CSS para estilização responsiva e moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter como padrão e um fundo suave */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #1f2937; 
+            color: #e5e7eb; 
+        }
+
+        /* Estilos Customizados do Piano */
+        .piano-key {
+            transition: background-color 0.05s ease, transform 0.05s ease;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-weight: 500;
+        }
+
+        /* CHAVES BRANCAS */
+        .white-key {
+            width: 30px; 
+            height: 150px; 
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-top: none; 
+            border-left: none;
+            margin-right: 0;
+            z-index: 10;
+            border-radius: 0 0 4px 4px;
+        }
+        .white-key:active, .key-active-white {
+            background-color: #ffcc99;
+            transform: translateY(2px);
+            box-shadow: none;
+        }
+
+        /* CHAVES PRETAS */
+        .black-key {
+            width: 20px; 
+            height: 100px; 
+            background-color: #1f2937;
+            position: absolute;
+            z-index: 20;
+            margin-left: -10px;
+            margin-right: -10px;
+            border: 1px solid #000;
+            border-radius: 0 0 4px 4px;
+        }
+        .black-key:active, .key-active-black {
+            background-color: #555555;
+            transform: translateY(2px);
+            box-shadow: none;
+        }
+        
+        /* Estilo para faders (sliders verticais) */
+        .fader {
+            -webkit-appearance: none;
+            width: 8px; 
+            height: 120px;
+            background: #4b5563; 
+            border-radius: 4px;
+            cursor: pointer;
+            transform: rotateZ(180deg);
+        }
+
+        .fader::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px; 
+            height: 24px; 
+            border-radius: 50%;
+            background: #3b82f6; 
+            cursor: pointer;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .fader::-moz-range-thumb {
+            width: 24px; 
+            height: 24px; 
+            border-radius: 50%;
+            background: #3b82f6; 
+            cursor: pointer;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Estilo para a barra de exibição de status */
+        #status-display {
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* Melhorias visuais para o piano */
+        .piano-container {
+            overflow-x: auto;
+            padding: 20px;
+            background: #111827;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .key-label {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        .black-key .key-label {
+            color: #999;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Cabeçalho -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-blue-400 mb-2">Piano Gemini</h1>
+            <p class="text-gray-400">Piano Digital Avançado com Camada e Divisão</p>
+        </div>
+        
+        <!-- Painel de Controle Principal -->
+        <div id="control-panel" class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-8">
+            
+            <!-- Barra de Status/Mensagens -->
+            <div id="status-display" class="bg-gray-700 text-yellow-400 border border-yellow-600">
+                🎵 CLIQUE EM QUALQUER LUGAR PARA INICIAR O ÁUDIO 🎵
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+
+                <!-- Coluna 1: Modos e Volumes -->
+                <div class="p-4 bg-gray-700 rounded-lg shadow-inner">
+                    <h2 class="text-xl font-bold text-center mb-4 text-blue-300">🎛️ MODOS & MIXAGEM</h2>
+                    <div class="flex justify-center space-x-2 mb-4">
+                        <button id="mode-single" class="mode-btn px-4 py-2 rounded-full font-semibold text-sm transition bg-blue-600 text-white shadow-lg">SINGLE</button>
+                        <button id="mode-layer" class="mode-btn px-4 py-2 rounded-full font-semibold text-sm transition bg-gray-600 hover:bg-gray-500 shadow">LAYER</button>
+                        <button id="mode-split" class="mode-btn px-4 py-2 rounded-full font-semibold text-sm transition bg-gray-600 hover:bg-gray-500 shadow">SPLIT</button>
+                    </div>
+
+                    <div class="flex justify-around items-end mt-4">
+                        <div class="flex flex-col items-center">
+                            <input type="range" id="volume-synth1" min="-20" max="0" value="-6" step="1" class="fader">
+                            <label class="text-xs mt-2 text-white">Synth 1 Vol (-6dB)</label>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <input type="range" id="volume-synth2" min="-20" max="0" value="-6" step="1" class="fader">
+                            <label class="text-xs mt-2 text-white">Synth 2 Vol (-6dB)</label>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <input type="range" id="volume-master" min="-10" max="0" value="-1" step="0.5" class="fader">
+                            <label class="text-xs mt-2 text-red-300 font-bold">MASTER (-1dB)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna 2: Presets (Vozes) -->
+                <div class="p-4 bg-gray-700 rounded-lg shadow-inner">
+                    <h2 class="text-xl font-bold text-center mb-4 text-green-300">🎹 PRESETS (VOZES)</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="preset-synth1" class="block text-sm font-medium text-white mb-1">🎵 VOZ 1 (Principal):</label>
+                            <select id="preset-synth1" class="w-full bg-gray-900 border border-gray-600 text-white p-2 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                <option value="am-synth" selected>🎼 Piano Híbrido</option>
+                                <option value="fm-organ">🎺 Órgão FM</option>
+                                <option value="am-brass">🎷 Metais</option>
+                                <option value="am-pad">🌊 Pad Suave</option>
+                                <option value="fm-synth">🔊 Sintetizador FM</option>
+                                <option value="am-bell">🔔 Sino Digital</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="preset-synth2" class="block text-sm font-medium text-white mb-1">🎵 VOZ 2 (Camada/Divisão):</label>
+                            <select id="preset-synth2" class="w-full bg-gray-900 border border-gray-600 text-white p-2 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                <option value="fm-synth">🔊 Sintetizador FM</option>
+                                <option value="am-bell" selected>🔔 Sino Digital</option>
+                                <option value="fm-bass">🎸 Baixo Percussivo</option>
+                                <option value="fm-drone">🌀 Drone</option>
+                                <option value="am-synth">🎼 Piano Híbrido</option>
+                                <option value="fm-organ">🎺 Órgão FM</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna 3 e 4: Efeitos -->
+                <div class="p-4 bg-gray-700 rounded-lg shadow-inner col-span-1 md:col-span-2">
+                    <h2 class="text-xl font-bold text-center mb-4 text-purple-300">🎚️ EFEITOS</h2>
+                    <div class="flex flex-wrap justify-around items-end gap-4">
+                        <div class="flex flex-col items-center">
+                            <input type="range" id="effect-delay" min="0" max="0.5" value="0" step="0.05" class="fader">
+                            <label class="text-xs mt-2 text-white">⏱️ Delay (0.0s)</label>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <input type="range" id="effect-reverb" min="0" max="0.9" value="0.1" step="0.1" class="fader">
+                            <label class="text-xs mt-2 text-white">🏛️ Reverb (0.1)</label>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <input type="range" id="effect-distortion" min="0" max="1" value="0" step="0.1" class="fader">
+                            <label class="text-xs mt-2 text-white">🎸 Distorção (0.0)</label>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <input type="range" id="effect-chorus" min="0" max="1" value="0" step="0.1" class="fader">
+                            <label class="text-xs mt-2 text-white">🎵 Chorus (0.0)</label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Layout do Piano -->
+        <div class="piano-container">
+            <div id="piano" class="flex justify-center">
+                <!-- As teclas serão renderizadas aqui pelo JavaScript -->
+            </div>
+        </div>
+
+        <!-- Legenda do Teclado e Instruções -->
+        <div class="mt-8 bg-gray-800 p-6 rounded-xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-bold text-blue-300 mb-3">🎹 Teclas do Teclado:</h3>
+                    <div class="text-sm text-gray-300 space-y-2">
+                        <p><strong>Oitava Central (C3-B3):</strong> Z, S, X, D, C, V, G, B, H, N, J, M</p>
+                        <p><strong>Oitava Superior (C4-B4):</strong> A, W, S, E, D, F, T, G, Y, H, U, J</p>
+                        <p><strong>Oitava Aguda (C5-B5):</strong> K, O, L, P, ;, ', [, ], -, =, 0, \</p>
+                        <p class="text-yellow-400 mt-2">💡 Use SHIFT para oitavas mais altas</p>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-green-300 mb-3">🎯 Como Usar:</h3>
+                    <div class="text-sm text-gray-300 space-y-2">
+                        <p><strong>SINGLE:</strong> Apenas a Voz 1 toca</p>
+                        <p><strong>LAYER:</strong> Ambas as vozes tocam juntas</p>
+                        <p><strong>SPLIT:</strong> Voz 1 (esquerda) + Voz 2 (direita)</p>
+                        <p><strong>Divisão:</strong> A partir do G4 (tecla 'G')</p>
+                        <p class="text-yellow-400 mt-2">🎮 Clique nas teclas ou use o teclado QWERTY</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="mt-6 text-center text-xs text-gray-500">
+            <p>Piano Digital Avançado - Desenvolvido com Tone.js | Pressione qualquer tecla ou clique para iniciar</p>
+        </div>
+
+    </div>
+
+    <script>
+        // =========================================================================
+        // CONFIGURAÇÕES GLOBAIS E MAPEAMENTO DE TECLAS
+        // =========================================================================
+
+        // Configuração das Notas: C2 a F#7
+        const START_NOTE = 36; // C2 (MIDI 36)
+        const END_NOTE = 90;   // F#7 (MIDI 90)
+        const NOTES = [];
+        
+        // Mapeamento de Teclas do Teclado (QWERTY) para Notas
+        const KEY_MAP = {
+            // Oitava 3
+            'z': 'C3', 's': 'C#3', 'x': 'D3', 'd': 'D#3', 'c': 'E3', 'v': 'F3', 
+            'g': 'F#3', 'b': 'G3', 'h': 'G#3', 'n': 'A3', 'j': 'A#3', 'm': 'B3',
+            
+            // Oitava 4
+            'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4', 'f': 'F4',
+            't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4', 'u': 'A#4', 'j': 'B4',
+            
+            // Oitava 5
+            'k': 'C5', 'o': 'C#5', 'l': 'D5', 'p': 'D#5', ';': 'E5', "'": 'F5',
+            '[': 'F#5', ']': 'G5', '\\': 'G#5'
+        };
+
+        const MODES = { 
+            SINGLE: 'single', 
+            LAYER: 'layer', 
+            SPLIT: 'split' 
+        };
+
+        // Variáveis globais
+        let mode = MODES.SINGLE;
+        let isReady = false;
+        const keysDown = new Set();
+        const activeKeys = new Set();
+
+        // Ponto de divisão para o modo SPLIT
+        const SPLIT_POINT_NOTE = 'G4'; 
+        const MIDI_SPLIT_POINT = Tone.Midi(SPLIT_POINT_NOTE).toMidi();
+
+        // Presets de vozes
+        const SYNTH_PRESETS = {
+            'am-synth': { 
+                name: 'Piano Híbrido', 
+                type: Tone.AMSynth, 
+                options: { 
+                    volume: -10, 
+                    envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.1 }
+                } 
+            },
+            'fm-synth': { 
+                name: 'Sintetizador FM', 
+                type: Tone.FMSynth, 
+                options: { 
+                    volume: -10, 
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.1 },
+                    modulationIndex: 10, 
+                    harmonicity: 3.4 
+                } 
+            },
+            'fm-organ': { 
+                name: 'Órgão FM', 
+                type: Tone.FMSynth, 
+                options: { 
+                    volume: -8, 
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 1, release: 0.2 },
+                    modulationIndex: 1, 
+                    harmonicity: 0.5 
+                } 
+            },
+            'am-brass': { 
+                name: 'Metais', 
+                type: Tone.AMSynth, 
+                options: { 
+                    volume: -5, 
+                    envelope: { attack: 0.5, decay: 0.1, sustain: 0.9, release: 0.1 }
+                } 
+            },
+            'am-pad': { 
+                name: 'Pad Suave', 
+                type: Tone.AMSynth, 
+                options: { 
+                    volume: -12, 
+                    envelope: { attack: 1.5, decay: 1.0, sustain: 0.7, release: 0.1 }
+                } 
+            },
+            'am-bell': { 
+                name: 'Sino Digital', 
+                type: Tone.AMSynth, 
+                options: { 
+                    volume: -8, 
+                    envelope: { attack: 0.01, decay: 0.8, sustain: 0.1, release: 0.1 }
+                } 
+            },
+            'fm-bass': { 
+                name: 'Baixo Percussivo', 
+                type: Tone.FMSynth, 
+                options: { 
+                    volume: -5, 
+                    envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.1 },
+                    modulationIndex: 5, 
+                    harmonicity: 1 
+                } 
+            },
+            'fm-drone': { 
+                name: 'Drone', 
+                type: Tone.FMSynth, 
+                options: { 
+                    volume: -15, 
+                    envelope: { attack: 2.0, decay: 0.5, sustain: 1, release: 0.1 },
+                    modulationIndex: 1, 
+                    harmonicity: 1 
+                } 
+            }
+        };
+
+        // Instâncias do Tone.js
+        let synth1, synth2;
+        let delay, reverb, distortion, chorus;
+        let masterVolume;
+
+        // =========================================================================
+        // FUNÇÕES PRINCIPAIS
+        // =========================================================================
+
+        // Cria a lista de todas as notas a serem renderizadas
+        function generateNotes() {
+            for (let i = START_NOTE; i <= END_NOTE; i++) {
+                const noteName = Tone.Midi(i).toNote();
+                const isBlack = noteName.includes('#');
+                NOTES.push({ 
+                    midi: i, 
+                    name: noteName, 
+                    isBlack: isBlack, 
+                    octave: Tone.Midi(i).toOctave() 
+                });
+            }
+        }
+
+        // Inicializa o áudio
+        function initializeAudio() {
+            if (isReady) return;
+
+            try {
+                // 1. Master Volume
+                masterVolume = new Tone.Volume(document.getElementById('volume-master').value).toDestination();
+
+                // 2. Efeitos
+                delay = new Tone.PingPongDelay(0, 0.5).connect(masterVolume);
+                reverb = new Tone.Reverb(5).connect(delay);
+                distortion = new Tone.Distortion(0).connect(reverb);
+                chorus = new Tone.Chorus(4, 2.5, 0.5).connect(distortion);
+
+                // 3. Inicialização dos Synths
+                const preset1 = SYNTH_PRESETS[document.getElementById('preset-synth1').value];
+                const preset2 = SYNTH_PRESETS[document.getElementById('preset-synth2').value];
+
+                synth1 = new Tone.PolySynth(preset1.type, preset1.options).connect(chorus);
+                synth2 = new Tone.PolySynth(preset2.type, preset2.options).connect(chorus);
+                
+                // 4. Configura volume inicial
+                synth1.volume.value = document.getElementById('volume-synth1').value;
+                synth2.volume.value = document.getElementById('volume-synth2').value;
+
+                // 5. Configura faders
+                setupAllFaders();
+                
+                isReady = true;
+                updateKeyDisplay('✅ PRONTO - Áudio Inicializado!', 'up');
+                
+                console.log('Audio Context inicializado com sucesso!');
+
+            } catch (error) {
+                console.error('Erro ao inicializar áudio:', error);
+                updateKeyDisplay('❌ Erro ao inicializar áudio', 'error');
+            }
+        }
+        
+        // Altera o preset do sintetizador
+        function changeSynthPreset(synthNumber, presetKey) {
+            if (!isReady) return;
+
+            try {
+                const preset = SYNTH_PRESETS[presetKey];
+                const oldSynth = synthNumber === 1 ? synth1 : synth2;
+                const newSynth = new Tone.PolySynth(preset.type, preset.options).connect(chorus);
+
+                if (synthNumber === 1) {
+                    synth1 = newSynth;
+                    synth1.volume.value = document.getElementById('volume-synth1').value;
+                } else {
+                    synth2 = newSynth;
+                    synth2.volume.value = document.getElementById('volume-synth2').value;
+                }
+
+                oldSynth.dispose();
+                updateKeyDisplay(`🎹 Synth ${synthNumber} alterado para: ${preset.name}`, 'up');
+                
+            } catch (error) {
+                console.error('Erro ao alterar preset:', error);
+            }
+        }
+
+        // Toca uma nota
+        function playNote(note) {
+            if (!isReady) return;
+            
+            activeKeys.add(note);
+            const midi = Tone.Midi(note).toMidi();
+
+            try {
+                if (mode === MODES.SINGLE) {
+                    synth1.triggerAttack(note, Tone.now());
+                } else if (mode === MODES.LAYER) {
+                    synth1.triggerAttack(note, Tone.now());
+                    synth2.triggerAttack(note, Tone.now());
+                } else if (mode === MODES.SPLIT) {
+                    if (midi < MIDI_SPLIT_POINT) {
+                        synth1.triggerAttack(note, Tone.now());
+                    } else {
+                        synth2.triggerAttack(note, Tone.now());
+                    }
+                }
+                
+                // Feedback Visual
+                const keyElement = document.querySelector(`.piano-key[data-note="${note}"]`);
+                if (keyElement) {
+                    keyElement.classList.add(keyElement.classList.contains('white-key') ? 'key-active-white' : 'key-active-black');
+                }
+
+            } catch (error) {
+                console.error('Erro ao tocar nota:', error);
+            }
+        }
+
+        // Para uma nota
+        function stopNote(note) {
+            if (!isReady) return;
+            
+            activeKeys.delete(note);
+            const midi = Tone.Midi(note).toMidi();
+
+            try {
+                if (mode === MODES.SINGLE) {
+                    synth1.triggerRelease(note, Tone.now());
+                } else if (mode === MODES.LAYER) {
+                    synth1.triggerRelease(note, Tone.now());
+                    synth2.triggerRelease(note, Tone.now());
+                } else if (mode === MODES.SPLIT) {
+                    if (midi < MIDI_SPLIT_POINT) {
+                        synth1.triggerRelease(note, Tone.now());
+                    } else {
+                        synth2.triggerRelease(note, Tone.now());
+                    }
+                }
+
+                // Feedback Visual
+                const keyElement = document.querySelector(`.piano-key[data-note="${note}"]`);
+                if (keyElement) {
+                    keyElement.classList.remove('key-active-white', 'key-active-black');
+                }
+
+            } catch (error) {
+                console.error('Erro ao parar nota:', error);
+            }
+        }
+
+        // =========================================================================
+        // INTERFACE DO USUÁRIO
+        // =========================================================================
+
+        // Renderiza o piano
+        function renderPiano() {
+            const pianoElement = document.getElementById('piano');
+            pianoElement.innerHTML = '';
+            
+            // Cria um container para as teclas
+            const keysContainer = document.createElement('div');
+            keysContainer.className = 'flex relative';
+            pianoElement.appendChild(keysContainer);
+
+            NOTES.forEach(note => {
+                const keyElement = document.createElement('div');
+                keyElement.setAttribute('data-note', note.name);
+                
+                const isBlack = note.isBlack;
+                keyElement.className = `piano-key ${isBlack ? 'black-key' : 'white-key'}`;
+
+                // Adiciona label da nota
+                const noteLabel = document.createElement('div');
+                noteLabel.className = 'key-label';
+                
+                // Mostra apenas algumas notas para não poluir
+                if (!isBlack && (note.name.includes('C') || note.name.includes('F'))) {
+                    noteLabel.textContent = note.name;
+                }
+                
+                keyElement.appendChild(noteLabel);
+                keysContainer.appendChild(keyElement);
+            });
+            
+            setupKeyEvents();
+        }
+        
+        // Configura eventos das teclas
+        function setupKeyEvents() {
+            const pianoElement = document.getElementById('piano');
+
+            // Eventos de Mouse
+            pianoElement.querySelectorAll('.piano-key').forEach(keyElement => {
+                const note = keyElement.getAttribute('data-note');
+                
+                keyElement.addEventListener('mousedown', () => {
+                    if (!activeKeys.has(note)) {
+                        playNote(note);
+                        updateKeyDisplay(`🎵 Tocando: ${note}`, 'down');
+                    }
+                });
+
+                keyElement.addEventListener('mouseup', () => {
+                    if (activeKeys.has(note)) {
+                        stopNote(note);
+                        updateKeyDisplay('✅ PRONTO', 'up');
+                    }
+                });
+
+                keyElement.addEventListener('mouseleave', () => {
+                    if (activeKeys.has(note)) {
+                        stopNote(note);
+                        updateKeyDisplay('✅ PRONTO', 'up');
+                    }
+                });
+            });
+
+            // Suporte a Toque
+            pianoElement.addEventListener('touchstart', (event) => {
+                event.preventDefault(); 
+                initializeAudioIfNeeded();
+                
+                Array.from(event.touches).forEach(touch => {
+                    const keyElement = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.piano-key');
+                    if (keyElement) {
+                        const note = keyElement.getAttribute('data-note');
+                        if (!activeKeys.has(note)) {
+                           playNote(note);
+                           updateKeyDisplay(`🎵 Tocando: ${note}`, 'down');
+                        }
+                    }
+                });
+            }, { passive: false });
+
+            pianoElement.addEventListener('touchend', (event) => {
+                event.preventDefault();
+                activeKeys.forEach(note => stopNote(note));
+                updateKeyDisplay('✅ PRONTO', 'up');
+            });
+        }
+
+        // Configura os faders
+        function setupAllFaders() {
+            // Master Volume
+            document.getElementById('volume-master').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                masterVolume.volume.value = value;
+                e.target.nextElementSibling.textContent = `MASTER (${value}dB)`;
+            });
+
+            // Synth Volumes
+            document.getElementById('volume-synth1').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                synth1.volume.value = value;
+                e.target.nextElementSibling.textContent = `Synth 1 Vol (${value}dB)`;
+            });
+            document.getElementById('volume-synth2').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                synth2.volume.value = value;
+                e.target.nextElementSibling.textContent = `Synth 2 Vol (${value}dB)`;
+            });
+
+            // Efeitos
+            document.getElementById('effect-delay').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                delay.delayTime.value = value;
+                e.target.nextElementSibling.textContent = `⏱️ Delay (${value.toFixed(1)}s)`;
+            });
+
+            document.getElementById('effect-reverb').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                reverb.wet.value = value;
+                e.target.nextElementSibling.textContent = `🏛️ Reverb (${value.toFixed(1)})`;
+            });
+
+            document.getElementById('effect-distortion').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                distortion.distortion = value;
+                e.target.nextElementSibling.textContent = `🎸 Distorção (${value.toFixed(1)})`;
+            });
+
+            document.getElementById('effect-chorus').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                chorus.wet.value = value;
+                e.target.nextElementSibling.textContent = `🎵 Chorus (${value.toFixed(1)})`;
+            });
+
+            // Presets
+            document.getElementById('preset-synth1').addEventListener('change', (e) => {
+                changeSynthPreset(1, e.target.value);
+            });
+            document.getElementById('preset-synth2').addEventListener('change', (e) => {
+                changeSynthPreset(2, e.target.value);
+            });
+        }
+        
+        // Define o modo de operação
+        function setMode(newMode) {
+            mode = newMode;
+            
+            // Atualiza botões
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-600', 'hover:bg-gray-500');
+            });
+            document.getElementById(`mode-${newMode}`).classList.remove('bg-gray-600', 'hover:bg-gray-500');
+            document.getElementById(`mode-${newMode}`).classList.add('bg-blue-600', 'text-white');
+
+            // Atualiza display
+            const modeName = newMode.toUpperCase();
+            let message = `🎯 MODO: ${modeName}`;
+            if (modeName === 'SPLIT') {
+                message += ` - Divisão em ${SPLIT_POINT_NOTE}`;
+            }
+            updateKeyDisplay(message, 'up');
+            
+            // Para todas as notas ao trocar de modo
+            activeKeys.forEach(note => stopNote(note));
+        }
+
+        // Atualiza a barra de status
+        function updateKeyDisplay(message, state) {
+            const display = document.getElementById('status-display');
+            display.textContent = message;
+            display.classList.remove('bg-green-600', 'bg-yellow-600', 'bg-red-600', 'bg-gray-700', 'text-white');
+            
+            if (state === 'down') {
+                display.classList.add('bg-green-600', 'text-white');
+            } else if (state === 'up') {
+                display.classList.add('bg-yellow-600', 'text-white');
+            } else if (state === 'error') {
+                display.classList.add('bg-red-600', 'text-white');
+            } else {
+                display.classList.add('bg-gray-700', 'text-yellow-400');
+            }
+        }
+
+        // Inicializa áudio se necessário
+        function initializeAudioIfNeeded() {
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(initializeAudio);
+            } else if (!isReady) {
+                initializeAudio();
+            }
+        }
+
+        // =========================================================================
+        // EVENTOS DE TECLADO
+        // =========================================================================
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            
+            if (note && !keysDown.has(key)) {
+                e.preventDefault();
+                initializeAudioIfNeeded();
+                keysDown.add(key);
+                playNote(note);
+                updateKeyDisplay(`🎵 Tocando: ${note} (${key.toUpperCase()})`, 'down');
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            
+            if (note && keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.delete(key);
+                stopNote(note);
+                
+                if (keysDown.size === 0) {
+                    updateKeyDisplay('✅ PRONTO', 'up');
+                } else {
+                    const lastKey = Array.from(keysDown).pop();
+                    updateKeyDisplay(`🎵 Tocando: ${KEY_MAP[lastKey]}...`, 'down');
+                }
+            }
+        });
+
+        // =========================================================================
+        // INICIALIZAÇÃO
+        // =========================================================================
+
+        // Eventos de Modo
+        document.getElementById('mode-single').addEventListener('click', () => setMode(MODES.SINGLE));
+        document.getElementById('mode-layer').addEventListener('click', () => setMode(MODES.LAYER));
+        document.getElementById('mode-split').addEventListener('click', () => setMode(MODES.SPLIT));
+
+        // Inicia o contexto de áudio no primeiro clique
+        document.body.addEventListener('click', () => {
+            initializeAudioIfNeeded();
+        }, { once: true });
+
+        // Inicialização quando a página carrega
+        window.addEventListener('load', () => {
+            generateNotes();
+            renderPiano();
+            setMode(MODES.SINGLE);
+            updateKeyDisplay('🎵 Clique em qualquer lugar ou pressione uma tecla para começar!', 'up');
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sintetizador Híbrido Roland/FM com Super Knob e Sequencer</title>
+    <!-- Tone.js v14.8.49: Versão estável que suporta todos os efeitos e synths -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <!-- Carrega Tailwind CSS para estilização responsiva e moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter como padrão e um fundo escuro */
+        body { font-family: 'Inter', sans-serif; background-color: #1f2937; }
+
+        /* Estilos Customizados do Piano */
+        .piano-key {
+            transition: background-color 0.05s ease, transform 0.05s ease;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-weight: 500;
+        }
+
+        /* CHAVES BRANCAS */
+        .white-key {
+            width: 32px; /* Ligeiramente mais largas para 67 teclas */
+            height: 160px; 
+            background-color: #f3f4f6;
+            border: 1px solid #111827;
+            border-top: none;
+            border-right: none;
+            z-index: 10;
+        }
+
+        /* CHAVES PRETAS */
+        .black-key {
+            width: 20px; 
+            height: 100px; 
+            background-color: #111827;
+            margin: 0 -10px;
+            z-index: 20;
+            border-radius: 0 0 4px 4px;
+        }
+
+        /* ESTADO ATIVO (AO TOCAR) */
+        .key-active.white-key {
+            background-color: #7dd3fc; /* Azul Claro (Ciano) */
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        .key-active.black-key {
+            background-color: #374151; /* Cinza escuro */
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Faders - Estilo para barras de range (Estilo moderno) */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #374151; /* Fundo escuro */
+            border-radius: 5px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fde047; /* Amarelo/Dourado */
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(253, 224, 71, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Estilo do Painel LED (Visor de Notas) */
+        #key-display {
+            background-color: #0d1727; 
+            color: #10b981; /* Verde LED */
+            text-shadow: 0 0 5px rgba(16, 185, 129, 0.8);
+            border: 2px solid #374151;
+            font-family: 'DSEG7 Classic', monospace; /* Fonte monoespaçada para efeito digital */
+        }
+
+        /* Sequencer Step Button */
+        .step-button {
+            transition: background-color 0.1s;
+        }
+        .step-active {
+            background-color: #f97316 !important; /* Laranja LED */
+            box-shadow: 0 0 5px #f97316;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 flex flex-col items-center">
+
+    <div class="max-w-7xl w-full space-y-6">
+        <h1 class="text-3xl font-extrabold text-white text-center mb-6 border-b-2 border-yellow-500 pb-2">Hybrid Synth: Roland Heritage & FM Power</h1>
+
+        <!-- PAINEL DE CONTROLE PRINCIPAL -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+            <h2 class="text-xl font-bold text-yellow-400 mb-4 border-b border-gray-700 pb-2">PAINEL DE CONTROLE</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- COLUNA 1: PRESETS E MODOS -->
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label for="preset-main" class="block text-sm font-medium text-gray-300">Preset PRINCIPAL (Main):</label>
+                        <select id="preset-main" class="w-full p-2 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"></select>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="preset-layer" class="block text-sm font-medium text-gray-300">Preset CAMADA/SPLIT (Layer):</label>
+                        <select id="preset-layer" class="w-full p-2 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"></select>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-300">Modo de Operação:</label>
+                        <div class="flex space-x-2">
+                            <button id="mode-single" class="mode-btn px-3 py-1 text-sm bg-green-600 text-white font-semibold rounded-lg shadow-md transition duration-150 hover:bg-green-700">Único</button>
+                            <button id="mode-layer" class="mode-btn px-3 py-1 text-sm bg-gray-600 text-gray-300 font-semibold rounded-lg shadow-md transition duration-150 hover:bg-gray-500">Camada</button>
+                            <button id="mode-split" class="mode-btn px-3 py-1 text-sm bg-gray-600 text-gray-300 font-semibold rounded-lg shadow-md transition duration-150 hover:bg-gray-500">Divisão</button>
+                        </div>
+                        <p id="mode-info" class="text-xs text-green-500"></p>
+                    </div>
+                </div>
+
+                <!-- COLUNA 2: FADERS DE EFEITOS -->
+                <div class="lg:col-span-2 grid grid-cols-3 gap-6 border-l border-r border-gray-700 px-6">
+                    <div class="col-span-3">
+                        <h3 class="text-lg font-semibold text-gray-300 mb-2">MODULAÇÃO E EFEITOS GLOBAIS</h3>
+                    </div>
+                    <!-- Faders normais -->
+                    <div id="fader-container" class="col-span-3 grid grid-cols-3 gap-4">
+                        <!-- Faders injetados aqui via JS (Delay Time, Feedback, Chorus Mix, etc.) -->
+                    </div>
+                </div>
+
+                <!-- COLUNA 3: SUPER KNOB & LED DISPLAY -->
+                <div class="flex flex-col items-center justify-between space-y-4">
+                    <!-- LED DISPLAY (Visor de Tecla) -->
+                    <div class="w-full">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">VISOR LED</label>
+                        <div id="key-display" class="p-3 rounded-lg shadow-inner min-w-[180px] text-center text-xl h-12 flex items-center justify-center font-mono">
+                            PRONTO
+                        </div>
+                    </div>
+
+                    <!-- SUPER KNOB -->
+                    <div class="w-full flex flex-col items-center p-4 bg-gray-700 rounded-lg shadow-xl border-t border-yellow-500/50">
+                        <label for="super-knob" class="text-lg font-bold text-yellow-400 mb-3">SUPER KNOB</label>
+                        <input type="range" id="super-knob" min="0" max="100" step="1" value="0" class="w-full">
+                        <span id="super-knob-value" class="text-sm text-yellow-300 mt-2">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEQUENCIADOR DE 16 PASSOS -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-red-700/50">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                <h2 class="text-xl font-bold text-red-500">SEQUENCIADOR DE 16 PASSOS</h2>
+                <div class="flex space-x-3">
+                    <input type="range" id="tempo-knob" min="60" max="240" step="5" value="120" class="w-24 h-2 bg-gray-700">
+                    <span id="tempo-value" class="text-white text-sm font-mono">120 BPM</span>
+                    <button id="sequencer-toggle" class="px-4 py-1 text-sm bg-red-600 text-white font-semibold rounded-lg shadow-md transition duration-150 hover:bg-red-700">INICIAR SEQ</button>
+                </div>
+            </div>
+            
+            <div id="sequencer-grid" class="overflow-x-auto">
+                <!-- 12 Linhas (Notas) x 16 Colunas (Passos) -->
+                <table class="min-w-full">
+                    <thead>
+                        <tr id="step-indicators">
+                            <th class="text-xs text-gray-400 p-1 w-10">NOTA</th>
+                            <!-- Indicadores de Passo (1 a 16) serão adicionados aqui -->
+                        </tr>
+                    </thead>
+                    <tbody id="sequencer-body">
+                        <!-- Linhas de Notas serão adicionadas aqui -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- TECLADO (67 TECLAS) -->
+        <div id="piano-container" class="flex relative justify-center bg-gray-700 p-4 rounded-xl shadow-2xl overflow-x-auto">
+            <div id="piano" class="flex relative h-[160px]">
+                <!-- As 67 teclas (C2 a F#7) são renderizadas por JavaScript -->
+            </div>
+        </div>
+
+        <p class="text-xs text-center text-gray-400 mt-4">Clique/Toque para iniciar o áudio. Suporte completo a Teclado QWERTY.</p>
+    </div>
+
+    <script>
+        // Variáveis Globais do Tone.js e Estado do Aplicativo
+        let isReady = false;
+        let synthMain, synthLayer, synthSplit;
+        let limiter, reverb, delay, chorus, volumeControl;
+        let sequencer, loop;
+        let currentStep = 0;
+        const activeKeys = new Map();
+        const MODES = { SINGLE: 'single', LAYER: 'layer', SPLIT: 'split' };
+        let currentMode = MODES.SINGLE;
+        const SPLIT_POINT_NOTE = 'C4'; // Ponto de divisão central
+
+        // Mapeamento de notas para teclado QWERTY
+        const KEY_MAP = {
+            'a': 'C3', 'w': 'C#3', 's': 'D3', 'e': 'D#3', 'd': 'E3', 'f': 'F3',
+            't': 'F#3', 'g': 'G3', 'y': 'G#3', 'h': 'A3', 'u': 'A#3', 'j': 'B3',
+            'k': 'C4', 'o': 'C#4', 'l': 'D4', 'p': 'D#4', ';': 'E4', "'": 'F4',
+            '[': 'F#4', ']': 'G4', '\\': 'G#4', 'enter': 'A4'
+        };
+        
+        // Sequencer: Notas de C4 a B4 (1 Oitava)
+        const SEQUENCER_NOTES = ['C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C4'];
+        let sequencerGridState = SEQUENCER_NOTES.map(() => Array(16).fill(false)); // 12 linhas, 16 colunas
+
+        // =========================================================================
+        // PRESETS: FM (Yamaha) & AWM2 (Roland)
+        // =========================================================================
+        const PRESETS = {
+            // --- ROLAND ICONIC TONES (AWM2/Hybrid Emulations) ---
+            "Roland Mid Grand (Hybrid)": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { oscillator: { type: "sine" }, envelope: { attack: 0.005, decay: 0.8, sustain: 0, release: 1.2 } }, voice1: { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 1.0, sustain: 0.1, release: 1.5 } } } },
+            "Roland MK-80 Hold (Rhodes)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 10, envelope: { attack: 0.001, decay: 0.7, sustain: 0.1, release: 1.5 }, modulation: { type: "triangle" }, carrier: { type: "sine" } } },
+            "JV Fantasia Pad (Wide)": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { detune: -10, oscillator: { type: "sawtooth" } }, voice1: { detune: 10, oscillator: { type: "square" } }, filter: { Q: 2, type: "lowpass" }, envelope: { attack: 1.5, decay: 2.0, sustain: 0.7, release: 4.0 } } },
+            "JV Orchestral Strings": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.5, decay: 1.5, sustain: 0.9, release: 2.0 }, filter: { type: "lowpass", frequency: 1000 } } },
+            "West Coast Layer (Pno+Pad)": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { detune: -5, oscillator: { type: "triangle" }, envelope: { attack: 0.005, decay: 0.5, sustain: 0.0, release: 0.8 } }, voice1: { detune: 5, oscillator: { type: "sawtooth" }, envelope: { attack: 1.0, decay: 2.5, sustain: 0.5, release: 3.0 } } } },
+            "Jupiter-80 Brass": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { detune: -8, oscillator: { type: "sawtooth" } }, voice1: { detune: 8, oscillator: { type: "sawtooth" } }, filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.5, octaves: 4 } } },
+            "XP-80 Punch Bass": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.0, release: 0.2 }, filter: { type: "lowpass", frequency: 200 } } },
+
+            // --- DX7 FM Classics (Herança da Yamaha) --- (Mantidos para variedade)
+            "E. PIANO 1 (Full Tines)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 12, envelope: { attack: 0.001, decay: 0.4, sustain: 0.1, release: 0.8 }, modulation: { type: "square" }, carrier: { type: "sine" } } },
+            "Lately Bass (TX81Z)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.8, modulationIndex: 8, envelope: { attack: 0.005, decay: 0.1, sustain: 0.01, release: 0.15 }, modulation: { type: "sawtooth" }, carrier: { type: "square" } } },
+            "MARIMBA DX7": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 2.0, modulationIndex: 5, envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.5 }, carrier: { type: "triangle" } } },
+            "SYN-LEAD Clássico": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.5, modulationIndex: 10, envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.5 }, modulation: { type: "sawtooth" }, carrier: { type: "square" } } },
+            "Warm Pad SY77": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.5, decay: 1.0, sustain: 0.7, release: 2.0 }, filter: { type: "lowpass", frequency: 500 } } },
+            "FM BASS Hardcore": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 5.0, modulationIndex: 50, envelope: { attack: 0.001, decay: 0.1, sustain: 0.0, release: 0.1 } } },
+        };
+
+        // Lista de Faders (Excluindo o Super Knob)
+        const FADERS = [
+            { id: 'reverb', label: 'Reverb (Mix)', target: null, property: 'wet', min: 0, max: 1, step: 0.05, initial: 0.2 },
+            { id: 'delay', label: 'Delay (Mix)', target: null, property: 'wet', min: 0, max: 1, step: 0.05, initial: 0.3 },
+            { id: 'chorus', label: 'Chorus (Mix)', target: null, property: 'wet', min: 0, max: 1, step: 0.05, initial: 0.1 },
+            { id: 'speed', label: 'Delay Time (s)', target: null, property: 'delayTime', min: 0.1, max: 1, step: 0.05, initial: 0.5 },
+            { id: 'feedback', label: 'Delay Feedback', target: null, property: 'feedback', min: 0, max: 0.9, step: 0.05, initial: 0.5 },
+            { id: 'volume', label: 'Volume (dB)', target: null, property: 'volume', min: -40, max: 0, step: 1, initial: -10 },
+        ];
+
+
+        // =========================================================================
+        // Funções de Inicialização
+        // =========================================================================
+
+        async function initializeAudio() {
+            if (isReady) return;
+            isReady = true;
+
+            // 1. Definição da Cadeia de Efeitos (Effects Chain)
+            limiter = new Tone.Limiter(-6).toDestination(); 
+            volumeControl = new Tone.Volume(-10).connect(limiter); 
+            reverb = new Tone.Reverb(2).connect(volumeControl); 
+            delay = new Tone.FeedbackDelay(0.5, 0.5).connect(reverb); 
+            chorus = new Tone.Chorus(4, 2.5, 0.5).connect(delay); 
+
+            // 2. Inicialização dos Sintetizadores
+            synthMain = new Tone.PolySynth(Tone.Synth).connect(chorus);
+            synthLayer = new Tone.PolySynth(Tone.Synth).connect(chorus);
+            synthSplit = new Tone.PolySynth(Tone.Synth).connect(chorus);
+
+            // 3. Mapeia os alvos dos Faders
+            FADERS.forEach(fader => {
+                if (fader.id === 'volume') fader.target = volumeControl;
+                if (fader.id === 'reverb') fader.target = reverb;
+                if (fader.id === 'delay' || fader.id === 'speed' || fader.id === 'feedback') fader.target = delay;
+                if (fader.id === 'chorus') fader.target = chorus;
+            });
+
+            // 4. Setup da UI
+            populatePresets();
+            setupModeButtons();
+            setupSequencer();
+            setupAllFaders(); // CORREÇÃO: Chamado aqui após a criação dos objetos Tone.js
+
+            // 5. Aplica presets e inicia o Super Knob
+            const initialPreset = Object.keys(PRESETS)[0];
+            document.getElementById('preset-main').value = initialPreset;
+            document.getElementById('preset-layer').value = initialPreset;
+            applyPreset('main', initialPreset);
+            applyPreset('layer', initialPreset);
+            applyPreset('split', initialPreset);
+            setMode(MODES.SINGLE);
+            setupSuperKnob(); 
+        }
+
+        /**
+         * Preenche os dropdowns de presets.
+         */
+        function populatePresets() {
+            const presetSelectMain = document.getElementById('preset-main');
+            const presetSelectLayer = document.getElementById('preset-layer');
+            const presetNames = Object.keys(PRESETS);
+
+            presetNames.forEach(name => {
+                const optionMain = document.createElement('option');
+                optionMain.value = name;
+                optionMain.textContent = name;
+                presetSelectMain.appendChild(optionMain);
+
+                const optionLayer = document.createElement('option');
+                optionLayer.value = name;
+                optionLayer.textContent = name;
+                presetSelectLayer.appendChild(optionLayer);
+            });
+            
+            presetSelectMain.addEventListener('change', (e) => applyPreset('main', e.target.value));
+            presetSelectLayer.addEventListener('change', (e) => {
+                applyPreset('layer', e.target.value);
+                applyPreset('split', e.target.value);
+            });
+        }
+        
+        /**
+         * Aplica um preset a um dos sintetizadores.
+         */
+        function applyPreset(target, presetName) {
+            const preset = PRESETS[presetName];
+            let targetNode;
+
+            switch (target) {
+                case 'main': targetNode = synthMain; break;
+                case 'layer': targetNode = synthLayer; break;
+                case 'split': targetNode = synthSplit; break;
+                default: return;
+            }
+
+            if (targetNode) {
+                targetNode.dispose();
+            }
+
+            const SynthConstructor = Tone[preset.synthType || "Synth"]; 
+            const newSynth = new Tone.PolySynth(SynthConstructor, preset.options).connect(chorus);
+
+            switch (target) {
+                case 'main': synthMain = newSynth; break;
+                case 'layer': synthLayer = newSynth; break;
+                case 'split': synthSplit = newSynth; break;
+            }
+        }
+
+        // =========================================================================
+        // Lógica de Modulação (Super Knob)
+        // =========================================================================
+
+        function setupSuperKnob() {
+            const knobInput = document.getElementById('super-knob');
+            const knobValueSpan = document.getElementById('super-knob-value');
+
+            knobInput.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value); // Valor de 0 a 100
+                knobValueSpan.textContent = value;
+                
+                // Mapeamento Múltiplo de Parâmetros
+                
+                // 1. Volume Principal (0: -20 dB | 100: -5 dB)
+                // Usando Tone.CtrlMap para mapeamento linear simples
+                const volumeMap = Tone.gainToDb(value / 100); // 0-1 em volume, convertido para dB
+                const mappedVolume = Tone.Math.map(value, 0, 100, -20, -5); 
+                volumeControl.volume.value = mappedVolume;
+
+                // 2. Reverb Wet (0: 0.0 | 100: 0.6)
+                const mappedReverb = Tone.Math.map(value, 0, 100, 0.0, 0.6);
+                reverb.wet.value = mappedReverb;
+
+                // 3. Delay Wet (0: 0.0 | 100: 0.4)
+                const mappedDelay = Tone.Math.map(value, 0, 100, 0.0, 0.4);
+                delay.wet.value = mappedDelay;
+            });
+            
+            // Define o valor inicial (0)
+            knobInput.dispatchEvent(new Event('input'));
+        }
+
+        /**
+         * Configura faders globais (Reverb, Delay, Chorus, etc.)
+         */
+        function setupAllFaders() {
+            const container = document.getElementById('fader-container');
+            container.innerHTML = ''; 
+
+            FADERS.forEach(fader => {
+                // Aplica o valor inicial ao objeto Tone.js
+                if (fader.target) {
+                    fader.target[fader.property].value = fader.initial;
+                }
+                
+                const div = document.createElement('div');
+                div.className = "flex flex-col space-y-1";
+                div.innerHTML = `
+                    <label for="${fader.id}" class="text-xs font-semibold text-gray-400">${fader.label}</label>
+                    <input type="range" id="${fader.id}" min="${fader.min}" max="${fader.max}" step="${fader.step}" 
+                           value="${fader.initial}" class="h-2">
+                    <span id="${fader.id}-value" class="text-xs text-yellow-500 font-mono">${fader.initial.toFixed(fader.step.toString().includes('.') ? 2 : 0)}</span>
+                `;
+                container.appendChild(div);
+
+                const input = div.querySelector(`#${fader.id}`);
+                const valueSpan = div.querySelector(`#${fader.id}-value`);
+
+                input.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    if (fader.target) {
+                         fader.target[fader.property].value = value;
+                    }
+                    valueSpan.textContent = value.toFixed(fader.step.toString().includes('.') ? 2 : 0);
+                });
+            });
+        }
+        
+        // =========================================================================
+        // Sequenciador
+        // =========================================================================
+
+        function setupSequencer() {
+            const body = document.getElementById('sequencer-body');
+            const indicators = document.getElementById('step-indicators');
+            const tempoKnob = document.getElementById('tempo-knob');
+            const tempoValueSpan = document.getElementById('tempo-value');
+            const toggleButton = document.getElementById('sequencer-toggle');
+
+            // 1. Renderiza os indicadores de passo
+            for (let i = 0; i < 16; i++) {
+                const th = document.createElement('th');
+                th.className = "text-xs text-gray-400 p-1 w-8";
+                th.textContent = (i + 1);
+                indicators.appendChild(th);
+            }
+
+            // 2. Renderiza a grade
+            SEQUENCER_NOTES.forEach((note, noteIndex) => {
+                const row = document.createElement('tr');
+                row.className = "border-t border-gray-700";
+                
+                // Célula de Nota
+                const noteCell = document.createElement('td');
+                noteCell.className = "text-xs text-white font-mono p-1 w-10 text-center";
+                noteCell.textContent = note;
+                row.appendChild(noteCell);
+                
+                // Células de Passo
+                for (let step = 0; step < 16; step++) {
+                    const stepCell = document.createElement('td');
+                    stepCell.className = "p-1 w-8";
+                    const button = document.createElement('button');
+                    button.className = "step-button w-5 h-5 rounded-full bg-gray-600 hover:bg-gray-500 transition-colors duration-100";
+                    button.setAttribute('data-note-index', noteIndex);
+                    button.setAttribute('data-step', step);
+                    
+                    button.addEventListener('click', () => {
+                        sequencerGridState[noteIndex][step] = !sequencerGridState[noteIndex][step];
+                        button.classList.toggle('bg-gray-600');
+                        button.classList.toggle('bg-blue-500');
+                        button.classList.toggle('hover:bg-gray-500');
+                        button.classList.toggle('hover:bg-blue-400');
+                    });
+                    
+                    stepCell.appendChild(button);
+                    row.appendChild(stepCell);
+                }
+                body.appendChild(row);
+            });
+            
+            // 3. Configuração do Tone.js Sequence
+            sequencer = new Tone.Sequence((time, step) => {
+                // Remove destaque do passo anterior
+                const prevIndicator = indicators.children[currentStep + 1];
+                if(prevIndicator) prevIndicator.classList.remove('text-green-500', 'step-active');
+
+                currentStep = step;
+                
+                // Destaca o passo atual
+                const currentIndicator = indicators.children[currentStep + 1];
+                if(currentIndicator) currentIndicator.classList.add('text-green-500', 'step-active');
+
+                // Itera sobre as notas para tocar
+                sequencerGridState.forEach((noteStates, noteIndex) => {
+                    if (noteStates[step]) {
+                        const note = SEQUENCER_NOTES[noteIndex];
+                        synthMain.triggerAttackRelease(note, "16n", time);
+                        
+                        // Efeito visual no botão do sequenciador
+                        const button = document.querySelector(`[data-note-index="${noteIndex}"][data-step="${step}"]`);
+                        if(button) {
+                            button.classList.add('step-active');
+                            setTimeout(() => button.classList.remove('step-active'), Tone.Time("16n").toMilliseconds() * 0.8);
+                        }
+                    }
+                });
+
+            }, Array.from({ length: 16 }, (_, i) => i), "16n");
+
+            // 4. Controles de Tempo (BPM)
+            Tone.Transport.bpm.value = tempoKnob.value;
+            tempoValueSpan.textContent = `${tempoKnob.value} BPM`;
+            
+            tempoKnob.addEventListener('input', (e) => {
+                const bpm = parseInt(e.target.value);
+                Tone.Transport.bpm.value = bpm;
+                tempoValueSpan.textContent = `${bpm} BPM`;
+            });
+
+            // 5. Toggle Start/Stop
+            toggleButton.addEventListener('click', () => {
+                if (Tone.Transport.state !== 'started') {
+                    sequencer.start(0);
+                    Tone.Transport.start();
+                    toggleButton.textContent = "PARAR SEQ";
+                    toggleButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    toggleButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                } else {
+                    sequencer.stop();
+                    Tone.Transport.stop();
+                    toggleButton.textContent = "INICIAR SEQ";
+                    toggleButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    toggleButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                    // Limpa o destaque do passo
+                    const activeIndicator = indicators.children[currentStep + 1];
+                    if(activeIndicator) activeIndicator.classList.remove('text-green-500', 'step-active');
+                    currentStep = 0;
+                }
+            });
+        }
+
+
+        // =========================================================================
+        // Lógica de Toque e Teclado (Modos Single/Layer/Split)
+        // =========================================================================
+
+        function setMode(mode) {
+            currentMode = mode;
+            const infoElement = document.getElementById('mode-info');
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('bg-green-600', 'text-white', 'hover:bg-green-700');
+                btn.classList.add('bg-gray-600', 'text-gray-300', 'hover:bg-gray-500');
+                if (btn.id === `mode-${mode}`) {
+                    btn.classList.remove('bg-gray-600', 'text-gray-300', 'hover:bg-gray-500');
+                    btn.classList.add('bg-green-600', 'text-white', 'hover:bg-green-700');
+                }
+            });
+
+            if (mode === MODES.SINGLE) {
+                infoElement.textContent = "Modo Único: Apenas o Preset Principal está ativo.";
+            } else if (mode === MODES.LAYER) {
+                infoElement.textContent = "Modo Camada: Os Presets Principal e Camada tocam juntos.";
+            } else if (mode === MODES.SPLIT) {
+                infoElement.textContent = `Modo Divisão: Notas abaixo de C4 usam Camada; C4 e acima usam Principal.`;
+            }
+        }
+
+        function setupModeButtons() {
+            document.getElementById('mode-single').addEventListener('click', () => setMode(MODES.SINGLE));
+            document.getElementById('mode-layer').addEventListener('click', () => setMode(MODES.LAYER));
+            document.getElementById('mode-split').addEventListener('click', () => setMode(MODES.SPLIT));
+        }
+
+        function playNote(note) {
+            if (!isReady || activeKeys.has(note)) return;
+
+            const noteMidi = Tone.Frequency(note).toMidi();
+            const splitMidi = Tone.Frequency(SPLIT_POINT_NOTE).toMidi();
+            const isBelowSplit = noteMidi < splitMidi;
+
+            if (currentMode === MODES.SINGLE) {
+                synthMain.triggerAttack(note);
+            } else if (currentMode === MODES.LAYER) {
+                synthMain.triggerAttack(note);
+                synthLayer.triggerAttack(note);
+            } else if (currentMode === MODES.SPLIT) {
+                if (isBelowSplit) {
+                    synthSplit.triggerAttack(note); 
+                } else {
+                    synthMain.triggerAttack(note); 
+                }
+            }
+
+            activeKeys.set(note, Date.now());
+            updateKeyDisplay(note);
+            updateKeyUI(note, true);
+        }
+
+        function stopNote(note) {
+            if (!activeKeys.has(note)) return;
+
+            const noteMidi = Tone.Frequency(note).toMidi();
+            const splitMidi = Tone.Frequency(SPLIT_POINT_NOTE).toMidi();
+            const isBelowSplit = noteMidi < splitMidi;
+
+            if (currentMode === MODES.SINGLE) {
+                synthMain.triggerRelease(note);
+            } else if (currentMode === MODES.LAYER) {
+                synthMain.triggerRelease(note);
+                synthLayer.triggerRelease(note);
+            } else if (currentMode === MODES.SPLIT) {
+                if (isBelowSplit) {
+                    synthSplit.triggerRelease(note);
+                } else {
+                    synthMain.triggerRelease(note);
+                }
+            }
+
+            activeKeys.delete(note);
+            updateKeyDisplay();
+            updateKeyUI(note, false);
+        }
+
+        function updateKeyUI(note, isActive) {
+            const keyElement = document.querySelector(`[data-note="${note}"]`);
+            if (keyElement) {
+                if (isActive) {
+                    keyElement.classList.add('key-active');
+                } else {
+                    keyElement.classList.remove('key-active');
+                }
+            }
+        }
+
+        function updateKeyDisplay(note = '') {
+            const display = document.getElementById('key-display');
+            if (activeKeys.size > 0) {
+                display.textContent = `TOCANDO: ${Array.from(activeKeys.keys()).join(', ')}`;
+            } else if (note) {
+                display.textContent = `NOTA: ${note}`;
+            } else {
+                display.textContent = 'PRONTO';
+            }
+        }
+
+
+        // =========================================================================
+        // UI do Piano (67 Teclas: C2 a F#7)
+        // =========================================================================
+
+        /**
+         * Gera o array de 67 notas (C2 a F#7).
+         */
+        function generateNotes() {
+            const notes = [];
+            const startOctave = 2;
+            const endOctave = 7;
+            const scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+            for (let octave = startOctave; octave <= endOctave; octave++) {
+                scale.forEach(noteName => {
+                    const fullNote = noteName + octave;
+                    notes.push(fullNote);
+                });
+            }
+            // O total de notas de C2 a C7 é 73. C2 a F#7 é 67.
+            return notes.slice(0, notes.indexOf('G7')); 
+        }
+
+        /**
+         * Renderiza o piano completo (C2 a F#7 - 67 teclas).
+         */
+        function renderPiano() {
+            const pianoElement = document.getElementById('piano');
+            const notes = generateNotes();
+            
+            notes.forEach(note => {
+                const isBlack = note.includes('#');
+                const keyElement = document.createElement('div');
+                keyElement.classList.add('piano-key', isBlack ? 'black-key' : 'white-key');
+                keyElement.setAttribute('data-note', note);
+                keyElement.setAttribute('id', `key-${note}`);
+
+                // Exibe a nota ou o nome da oitava em certas teclas brancas para referência
+                if (!isBlack && (note.includes('C') || note.includes('F'))) {
+                    keyElement.innerHTML = `<span class="mb-1 text-xs text-gray-600">${note}</span>`;
+                }
+
+                // Adiciona listeners de mouse/toque
+                keyElement.addEventListener('mousedown', () => playNote(note));
+                keyElement.addEventListener('mouseup', () => stopNote(note));
+                keyElement.addEventListener('mouseleave', () => stopNote(note));
+                pianoElement.appendChild(keyElement);
+            });
+
+            setupTouchEvents(pianoElement);
+        }
+
+        /**
+         * Configura eventos de toque para melhor suporte móvel.
+         */
+        function setupTouchEvents(pianoElement) {
+            // Suporte a toque
+            pianoElement.addEventListener('touchstart', (event) => {
+                event.preventDefault(); 
+                if (Tone.context.state !== 'running') {
+                    Tone.start().then(initializeAudio);
+                } else if (!isReady) {
+                    initializeAudio();
+                }
+                
+                Array.from(event.touches).forEach(touch => {
+                    const keyElement = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.piano-key');
+                    if (keyElement) {
+                        const note = keyElement.getAttribute('data-note');
+                        playNote(note);
+                    }
+                });
+            }, { passive: false });
+
+            pianoElement.addEventListener('touchend', (event) => {
+                event.preventDefault();
+                // Parar todas as notas ativas no final do toque, já que 'touchmove' não é fácil de rastrear
+                activeKeys.forEach(note => stopNote(note));
+            });
+        }
+
+
+        // =========================================================================
+        // Eventos de Teclado QWERTY e Inicialização Global
+        // =========================================================================
+
+        let keysDown = new Set();
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(initializeAudio);
+            } else if (!isReady) {
+                initializeAudio();
+            }
+
+            if (note && !keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.add(key);
+                playNote(note);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            if (note && keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.delete(key);
+                stopNote(note);
+            }
+        });
+
+        // Inicia o contexto de áudio no primeiro clique no corpo do documento (fallback)
+        document.body.addEventListener('click', () => {
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(initializeAudio); 
+            } else if (!isReady) {
+                initializeAudio();
+            }
+        }, { once: true });
+
+
+        // Inicialização: Renderiza a UI do piano
+        window.onload = () => {
+            renderPiano();
+            // A chamada para initializeAudio() e setupAllFaders() é feita no primeiro clique/toque.
+            // Apenas renderizamos a UI aqui.
+        };
+    </script>
+</body>
+</html>

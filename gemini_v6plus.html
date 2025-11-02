@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Digital Professional V2 (100+ Presets e Sequencer Melhorado)</title>
+    <!-- Tone.js v14.8.49: Versão estável que suporta todos os efeitos e synths -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <!-- Carrega Tailwind CSS para estilização responsiva e moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter como padrão */
+        body { font-family: 'Inter', sans-serif; background-color: #1a1a1a; }
+
+        /* Estilo para o fader (slider) vertical */
+        input[type=range][orient=vertical] {
+            writing-mode: bt-lr; /* IE */
+            -webkit-appearance: slider-vertical; /* Safari, Chrome */
+            width: 8px;
+            height: 100px;
+            padding: 0 5px;
+            cursor: pointer;
+        }
+
+        /* Estilo para Knobs (simulando um potenciômetro com um círculo) */
+        .knob-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .knob-track {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #333, #111);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 1px 1px rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+        }
+        .knob-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background-color: #fca311; /* Laranja/Amarelo de destaque */
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .knob-label {
+            font-size: 0.65rem;
+            margin-top: 4px;
+            color: #ccc;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        /* Estilos Customizados do Piano */
+        .piano-key {
+            transition: background-color 0.05s ease, transform 0.05s ease;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-weight: 500;
+        }
+
+        /* CHAVES BRANCAS */
+        .white-key {
+            width: 30px; 
+            height: 150px; 
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-top: none;
+            z-index: 1;
+            border-radius: 0 0 6px 6px;
+            transform-origin: bottom;
+        }
+        .white-key.active {
+            background-color: #e0e0e0;
+            transform: translateY(2px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) inset;
+        }
+
+        /* CHAVES PRETAS */
+        .black-key {
+            width: 20px; 
+            height: 100px; 
+            background-color: #2c2c2c;
+            border: 1px solid #000;
+            z-index: 2;
+            margin: 0 -10px; /* Sobrepõe as teclas brancas */
+            border-radius: 0 0 6px 6px;
+            transform-origin: bottom;
+        }
+        .black-key.active {
+            background-color: #1a1a1a;
+            transform: translateY(2px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset;
+        }
+
+        /* LCD Display - Estilo Dourado/Verde */
+        .lcd-display {
+            background-color: #333;
+            border: 3px solid #fca311;
+            box-shadow: 0 0 10px rgba(252, 163, 17, 0.5), inset 0 0 5px rgba(0, 0, 0, 0.8);
+            color: #fca311; /* Cor do texto (dourado) */
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 5px rgba(252, 163, 17, 0.8);
+            min-height: 60px;
+        }
+        /* Efeito de backlight (opcionalmente verde) */
+        .lcd-green {
+            border: 3px solid #00ff6a;
+            box-shadow: 0 0 10px rgba(0, 255, 106, 0.5), inset 0 0 5px rgba(0, 0, 0, 0.8);
+            color: #00ff6a; /* Cor do texto (verde) */
+            text-shadow: 0 0 5px rgba(0, 255, 106, 0.8);
+        }
+
+        /* Sequencer Step Button Active */
+        .step-active {
+            background-color: #fca311 !important;
+            box-shadow: 0 0 8px #fca311;
+            color: #1a1a1a;
+        }
+        
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center min-h-screen">
+    
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-50 text-white transition-opacity duration-500">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+        <p class="mt-4 text-lg">Carregando Módulos de Áudio (Tone.js)...</p>
+    </div>
+
+    <!-- Interface do Teclado Profissional -->
+    <div class="w-full max-w-6xl p-4 bg-gray-800 rounded-xl shadow-2xl border-b-8 border-gray-900">
+
+        <!-- PAINEL DE CONTROLE - ESTILO CONSOLE -->
+        <div class="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-900 rounded-lg shadow-inner-lg">
+            
+            <!-- COLUNA ESQUERDA: PRESET / SELEÇÃO -->
+            <div class="flex flex-col items-start space-y-3 mb-4 md:mb-0 w-full md:w-1/4">
+                <p class="text-xs text-gray-500 uppercase tracking-widest font-semibold">Preset Selection</p>
+                <div class="w-full flex space-x-2">
+                    <button id="prev-preset" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full text-white text-sm transition duration-150 shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <select id="preset-select" class="flex-grow bg-gray-700 text-white rounded-md p-2 text-sm appearance-none border border-gray-600 focus:ring-1 focus:ring-fca311 cursor-pointer">
+                        <!-- Options serão populadas via JS -->
+                    </select>
+                    <button id="next-preset" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full text-white text-sm transition duration-150 shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- CENTRO: DISPLAY LCD -->
+            <div id="lcd-display" class="lcd-display w-full md:w-2/4 text-center p-2 rounded-lg my-4 md:my-0 flex flex-col justify-center items-center">
+                <span id="display-preset-name" class="text-xl font-bold"></span>
+                <span id="display-preset-info" class="text-sm"></span>
+            </div>
+            
+            <!-- COLUNA DIREITA: FADERS/KNOBS DE EFEITO E VOLUME -->
+            <div class="flex justify-around items-end space-x-4 w-full md:w-1/4 pt-4 md:pt-0">
+                <!-- Fader Volume Principal -->
+                <div class="flex flex-col items-center">
+                    <label for="master-volume" class="knob-label text-white">MASTER VOL</label>
+                    <input type="range" orient="vertical" id="master-volume" min="-60" max="0" value="-10" step="0.1" class="mt-2 bg-gray-700 rounded-lg h-20">
+                </div>
+                
+                <!-- Knobs de Efeito (Simulados com Range Horizontal) -->
+                <div class="knob-container">
+                    <input type="range" id="knob-reverb" min="0" max="1" value="0.2" step="0.01" class="w-16 h-1 mt-2 appearance-none bg-gray-700 rounded-full [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#fca311] cursor-pointer">
+                    <label for="knob-reverb" class="knob-label">REVERB WET</label>
+                </div>
+                <div class="knob-container">
+                    <input type="range" id="knob-delay" min="0" max="0.5" value="0.1" step="0.01" class="w-16 h-1 mt-2 appearance-none bg-gray-700 rounded-full [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#fca311] cursor-pointer">
+                    <label for="knob-delay" class="knob-label">DELAY WET</label>
+                </div>
+                <div class="knob-container">
+                    <input type="range" id="knob-chorus" min="0" max="1" value="0.1" step="0.01" class="w-16 h-1 mt-2 appearance-none bg-gray-700 rounded-full [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#fca311] cursor-pointer">
+                    <label for="knob-chorus" class="knob-label">CHORUS WET</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO SEQUENCER DE 16 PASSOS -->
+        <div class="mt-6 p-4 bg-gray-700 rounded-lg shadow-inner-lg">
+            <h3 class="text-white text-xl font-semibold mb-3 border-b border-gray-600 pb-2">Sequencer de 16 Passos</h3>
+            <div class="flex flex-wrap justify-between items-center">
+                
+                <!-- Controles do Sequencer -->
+                <div class="flex space-x-3 mb-3 md:mb-0">
+                    <button id="toggle-sequence" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-150 font-medium shadow-lg">
+                        <span id="sequence-text">Tocar Sequência</span>
+                    </button>
+                    <button id="clear-sequence" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition duration-150 font-medium shadow-lg">
+                        Limpar Padrão
+                    </button>
+                    <div class="flex items-center space-x-2">
+                        <label for="tempo-range" class="text-white text-sm">BPM:</label>
+                        <input type="range" id="tempo-range" min="60" max="240" value="120" step="1" class="w-24 h-1 appearance-none bg-gray-600 rounded-full [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white cursor-pointer">
+                        <span id="tempo-display" class="text-white text-sm font-bold w-8">120</span>
+                    </div>
+                </div>
+
+                <!-- Botões de Sequencer (16 passos) -->
+                <div id="sequencer-steps" class="flex flex-wrap gap-2 mt-3 md:mt-0">
+                    <!-- Botões de passo serão inseridos aqui -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Piano Interativo (Teclas) -->
+        <div id="piano-keyboard" class="mt-6 flex justify-center items-center p-4 bg-gray-900 rounded-lg overflow-x-auto shadow-inner-lg">
+            <!-- As 67 teclas (C2 a F#7) serão inseridas aqui via JS -->
+        </div>
+
+        <!-- Instruções de Teclado (Visor de Estado) -->
+        <div class="mt-4 text-center text-gray-400 text-sm">
+            <p id="key-display-status">Aguardando Iniciação de Áudio...</p>
+            <p>Use o teclado do computador (Z-M, A-L, Q-P, 1-0) para tocar ou clique nas teclas.</p>
+        </div>
+    </div>
+
+    <script>
+        // Variáveis Globais
+        const KEY_MAP = {
+            'z': 'C3', 's': 'C#3', 'x': 'D3', 'd': 'D#3', 'c': 'E3', 'v': 'F3', 'g': 'F#3',
+            'b': 'G3', 'h': 'G#3', 'n': 'A3', 'j': 'A#3', 'm': 'B3', ',': 'C4', 'l': 'C#4',
+            '.': 'D4', ';': 'D#4', '/': 'E4',
+
+            'q': 'C4', '2': 'C#4', 'w': 'D4', '3': 'D#4', 'e': 'E4', 'r': 'F4', '5': 'F#4',
+            't': 'G4', '6': 'G#4', 'y': 'A4', '7': 'A#4', 'u': 'B4', 'i': 'C5', '9': 'C#5',
+            'o': 'D5', '0': 'D#5', 'p': 'E5'
+        };
+
+        let currentSynth = null;
+        let reverb, delay, chorus;
+        let isReady = false;
+        const keysDown = new Set();
+        let currentPresetIndex = 0;
+
+        // =========================================================================
+        // EXPANSÃO DA LISTA DE PRESETS (Mais de 100)
+        // =========================================================================
+
+        // Configuração base de um PolySynth com configurações detalhadas de Tone.js
+        const createSynthInstrument = (settings) => {
+            const synth = new Tone.PolySynth(Tone.Synth, {
+                volume: settings.volume || -12,
+                oscillator: settings.oscillator || { type: "sine" },
+                envelope: settings.envelope || { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 },
+                filter: settings.filter || undefined,
+                filterEnvelope: settings.filterEnvelope || undefined
+            });
+            // O sinal de saída é configurado em initializeAudio
+            return synth;
+        };
+        
+        // Define configurações de presets detalhadas
+        const PRESETS_DATA = [
+            // --- ROLAND HERITAGE (PADS, STRINGS, BRASS) ---
+            { name: "JP-8 Pad (Fantasia)", manufacturer: "Roland JV/XP", type: "Synth Pad", settings: { volume: -10, oscillator: { type: "sawtooth" }, envelope: { attack: 2, decay: 1, sustain: 0.8, release: 3 }, chorus: { freq: 1.5, depth: 0.7, delayTime: 3, feedback: 0.4, type: "sine" }, reverb: { decay: 4, wet: 0.6 } } },
+            { name: "Juno Strings (Classic)", manufacturer: "Roland Juno-106", type: "Synth String", settings: { volume: -8, oscillator: { type: "pulse", width: 0.25 }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.7, release: 2 }, chorus: { freq: 2, depth: 0.5, delayTime: 2, feedback: 0.3, type: "sine" }, reverb: { decay: 3, wet: 0.4 } } },
+            { name: "Jupiter Brass", manufacturer: "Roland Jupiter-8", type: "Synth Brass", settings: { volume: -7, oscillator: { type: "sawtooth", count: 2, spread: 30 }, envelope: { attack: 0.1, decay: 0.5, sustain: 0.6, release: 0.5 }, filter: { Q: 2, type: "lowpass" }, filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.5, basePath: 200, octaves: 3 } } },
+            { name: "D-50 Digital Dance", manufacturer: "Roland D-50", type: "Pad/Effect", settings: { volume: -11, oscillator: { type: "triangle" }, envelope: { attack: 0.1, decay: 0.5, sustain: 0.4, release: 1.5 }, delay: { delayTime: 0.3, feedback: 0.6 } } },
+            { name: "XP Session Piano", manufacturer: "Roland JV/XP", type: "Acoustic Piano", settings: { volume: -10, oscillator: { type: "sine" }, envelope: { attack: 0.02, decay: 0.8, sustain: 0.1, release: 1.2 }, chorus: { wet: 0 }, delay: { wet: 0 }, reverb: { decay: 2, wet: 0.3 } } },
+            { name: "Synth Pad Éterea", manufacturer: "Roland XP/JV", type: "Synth Pad", settings: { volume: -12, oscillator: { type: "square" }, envelope: { attack: 3, decay: 1.5, sustain: 0.7, release: 4 } } },
+            { name: "Saw Bass Octave", manufacturer: "Roland SH-101", type: "Synth Bass", settings: { volume: -5, oscillator: { type: "sawtooth" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.8, release: 0.1 }, filter: { Q: 8, type: "lowpass", frequency: 100 } } },
+            { name: "Mellow Organ", manufacturer: "Roland VK", type: "Organ", settings: { volume: -10, oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.5, sustain: 1, release: 0.5 } } },
+            { name: "Shimmer Bells", manufacturer: "Roland D-50", type: "Bell/FX", settings: { volume: -15, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 2 }, delay: { delayTime: 0.1, feedback: 0.7, wet: 0.4 } } },
+            { name: "Sweep Pad Fast", manufacturer: "Roland JP-8", type: "Synth Pad", settings: { volume: -10, oscillator: { type: "sawtooth" }, envelope: { attack: 1.5, decay: 1.5, sustain: 0.5, release: 3 }, filterEnvelope: { attack: 1, decay: 0.5, sustain: 0.5, release: 2, basePath: 500, octaves: 4 } } },
+            // +10 Roland Variations
+            ...Array.from({ length: 10 }, (_, i) => ({ 
+                name: `Roland Pad Var ${i + 1}`, manufacturer: "Roland Custom", type: "Synth Pad", 
+                settings: { volume: -12 - i/2, oscillator: { type: ["sawtooth", "triangle"][i % 2], detune: i * 5 }, envelope: { attack: 1 + i/5, decay: 0.5, sustain: 0.6, release: 2 + i/5 } }
+            })),
+
+            // --- YAMAHA HERITAGE (FM, PIANOS) ---
+            { name: "DX E. Piano 1 (Full Tines)", manufacturer: "Yamaha DX7", type: "Electric Piano", settings: { volume: -8, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.4, sustain: 0.1, release: 0.8 }, chorus: { freq: 1.2, depth: 0.8, delayTime: 1.5, feedback: 0.3, type: "square" } } },
+            { name: "Motif Power Grand", manufacturer: "Yamaha Motif", type: "Acoustic Piano", settings: { volume: -8, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 1.5 }, chorus: { wet: 0 }, delay: { wet: 0 }, reverb: { decay: 1.5, wet: 0.2 } } },
+            { name: "SY Brass of Choral", manufacturer: "Yamaha SY77", type: "Hybrid Brass", settings: { volume: -9, oscillator: { type: "square" }, envelope: { attack: 0.1, decay: 0.6, sustain: 0.7, release: 0.8 }, filter: { Q: 3, type: "highpass", frequency: 500 } } },
+            { name: "CFX Concert Grand", manufacturer: "Yamaha Montage", type: "Acoustic Piano", settings: { volume: -7, oscillator: { type: "sine" }, envelope: { attack: 0.02, decay: 0.9, sustain: 0.15, release: 1.8 }, reverb: { decay: 3, wet: 0.25 } } },
+            { name: "FM Metallic Bell", manufacturer: "Yamaha DX7", type: "Bell", settings: { volume: -15, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 1.5 } } },
+            { name: "Warm DX Pad", manufacturer: "Yamaha DX7", type: "Synth Pad", settings: { volume: -12, oscillator: { type: "sine" }, envelope: { attack: 2, decay: 1, sustain: 0.7, release: 3 } } },
+            { name: "FM Funky Bass", manufacturer: "Yamaha DX100", type: "Synth Bass", settings: { volume: -6, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.7, release: 0.05 }, filter: { Q: 5, type: "lowpass", frequency: 800 } } },
+            { name: "SY Hybrid String", manufacturer: "Yamaha SY99", type: "Synth String", settings: { volume: -10, oscillator: { type: "sawtooth" }, envelope: { attack: 1, decay: 0.8, sustain: 0.6, release: 1.5 } } },
+            // +10 Yamaha Variations
+            ...Array.from({ length: 10 }, (_, i) => ({ 
+                name: `Yamaha FM Var ${i + 1}`, manufacturer: "Yamaha Custom", type: ["Electric Piano", "Bell"][i % 2], 
+                settings: { volume: -10 + i/3, oscillator: { type: "sine", detune: i * 3 }, envelope: { attack: 0.01, decay: 0.3 + i/10, sustain: 0, release: 1 + i/5 } }
+            })),
+
+            // --- KORG & KURZWEIL HERITAGE ---
+            { name: "M1 Piano/Pad Combo", manufacturer: "Korg M1", type: "Hybrid Piano/Pad", settings: { volume: -8, oscillator: { type: "sine" }, envelope: { attack: 0.05, decay: 0.8, sustain: 0.1, release: 1.5 }, chorus: { wet: 0.3 }, reverb: { decay: 2, wet: 0.3 } } },
+            { name: "M1 Universe Pad", manufacturer: "Korg M1", type: "Synth Pad", settings: { volume: -10, oscillator: { type: "triangle" }, envelope: { attack: 3, decay: 1.5, sustain: 0.8, release: 5 }, delay: { delayTime: 0.5, feedback: 0.5 } } },
+            { name: "Triton Power Lead", manufacturer: "Korg Triton", type: "Synth Lead", settings: { volume: -6, oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.5 }, filter: { Q: 2, type: "lowpass", frequency: 1500 } } },
+            { name: "Kurzweil Triple Strike", manufacturer: "Kurzweil K2x", type: "Acoustic Piano", settings: { volume: -7, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.9, sustain: 0.1, release: 2 }, reverb: { decay: 2.5, wet: 0.2 } } },
+            { name: "V.A.S.T. String Pad", manufacturer: "Kurzweil K2x", type: "Synth String", settings: { volume: -11, oscillator: { type: "square" }, envelope: { attack: 1.5, decay: 1, sustain: 0.7, release: 2.5 } } },
+            { name: "Triton HipHop Pluck", manufacturer: "Korg Triton", type: "Pluck/Pop", settings: { volume: -10, oscillator: { type: "triangle" }, envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.5 } } },
+            { name: "Korg MS-20 Bass", manufacturer: "Korg MS-20", type: "Synth Bass", settings: { volume: -5, oscillator: { type: "pulse", width: 0.4 }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 0.2 }, filter: { Q: 10, type: "lowpass", frequency: 100 } } },
+            // +10 Korg/Kurzweil Variations
+            ...Array.from({ length: 10 }, (_, i) => ({ 
+                name: `Korg Pad Var ${i + 1}`, manufacturer: "Korg Custom", type: "Synth Pad", 
+                settings: { volume: -10 + i/2, oscillator: { type: ["sawtooth", "triangle"][i % 2] }, envelope: { attack: 2 + i/4, decay: 0.8, sustain: 0.5, release: 3 + i/4 } }
+            })),
+
+            // --- OUTROS ICÔNICOS (MOOG, PROPHET, EP's) ---
+            { name: "Prophet Brass Stabs", manufacturer: "Sequential Prophet-5", type: "Synth Brass", settings: { volume: -7, oscillator: { type: "sawtooth", count: 2, spread: 20 }, envelope: { attack: 0.05, decay: 0.5, sustain: 0.6, release: 0.3 } } },
+            { name: "Minimoog Fat Lead", manufacturer: "Moog Minimoog", type: "Synth Lead", settings: { volume: -5, oscillator: { type: "sawtooth", count: 3, spread: 30 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.9, release: 0.5 }, filter: { Q: 5, type: "lowpass", frequency: 1000 } } },
+            { name: "Minimoog Funk Bass", manufacturer: "Moog Minimoog", type: "Synth Bass", settings: { volume: -4, oscillator: { type: "triangle", count: 2, spread: 5 }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.8, release: 0.1 } } },
+            { name: "Fender Rhodes EP", manufacturer: "Fender Rhodes", type: "Electric Piano", settings: { volume: -9, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.6, sustain: 0.1, release: 1 }, chorus: { wet: 0.4 } } },
+            { name: "Wurlitzer Wurly EP", manufacturer: "Wurlitzer", type: "Electric Piano", settings: { volume: -8, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.2, release: 0.9 }, delay: { delayTime: 0.15, feedback: 0.4 } } },
+            { name: "Hammond B3 Full Bar", manufacturer: "Hammond B3", type: "Organ", settings: { volume: -6, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.2, sustain: 1, release: 0.5 }, chorus: { freq: 5, depth: 1, delayTime: 0, feedback: 0, type: "sine" } } },
+            { name: "ARP 2600 Lead", manufacturer: "ARP 2600", type: "Synth Lead", settings: { volume: -7, oscillator: { type: "sawtooth" }, envelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.4 }, filter: { Q: 4, type: "lowpass", frequency: 1200 } } },
+            // +10 Iconic Variations
+            ...Array.from({ length: 10 }, (_, i) => ({ 
+                name: `Iconic Lead Var ${i + 1}`, manufacturer: "Analog Custom", type: "Synth Lead", 
+                settings: { volume: -8 + i/4, oscillator: { type: "square", width: 0.5 - i/20 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.8, release: 0.5 } }
+            })),
+            
+            // --- VARIANTES E EXPANSÕES (Para alcançar 100+) ---
+            // 15 Pianos Acústicos e Eletricos
+            ...Array.from({ length: 15 }, (_, i) => ({ name: `Grand Piano V${i + 1}`, manufacturer: "Custom", type: "Acoustic Piano", settings: { volume: -9, oscillator: { type: "sine" }, envelope: { attack: 0.02, decay: 0.8 + i/10, sustain: 0.1, release: 1.5 - i/10 } } })),
+            ...Array.from({ length: 15 }, (_, i) => ({ name: `Tine EP Warm V${i + 1}`, manufacturer: "Custom", type: "Electric Piano", settings: { volume: -10, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.5 + i/10, sustain: 0.1, release: 1.2 - i/10 }, chorus: { wet: 0.3 } } })),
+            // 15 Basses
+            ...Array.from({ length: 15 }, (_, i) => ({ name: `Sub Bass Deep ${i + 1}`, manufacturer: "Custom", type: "Synth Bass", settings: { volume: -5, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.9, release: 0.1 }, filter: { Q: 5, type: "lowpass", frequency: 100 } } })),
+            // 15 Leads
+            ...Array.from({ length: 15 }, (_, i) => ({ name: `Screaming Lead ${i + 1}`, manufacturer: "Custom", type: "Synth Lead", settings: { volume: -6, oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.3 }, filter: { Q: 2, type: "highpass", frequency: 800 } } })),
+        ];
+
+        // Mapeia o array para um objeto de presets indexados para fácil acesso
+        const PRESETS = PRESETS_DATA.reduce((acc, preset) => {
+            acc[preset.name] = { 
+                manufacturer: preset.manufacturer, 
+                type: preset.type,
+                instrument: createSynthInstrument, 
+                settings: preset.settings 
+            };
+            return acc;
+        }, {});
+        
+        const presetNames = Object.keys(PRESETS);
+
+        // =========================================================================
+        // FUNÇÕES DE ÁUDIO E INICIALIZAÇÃO
+        // =========================================================================
+
+        /**
+         * Inicializa o contexto de áudio (necessário para navegadores) e os efeitos globais.
+         */
+        function initializeAudio() {
+            if (isReady) return;
+
+            // 1. Inicializa os Efeitos Globais
+            reverb = new Tone.Reverb(2).toDestination();
+            delay = new Tone.FeedbackDelay(0.3, 0.5).connect(reverb);
+            chorus = new Tone.Chorus(4, 2.5, 0.5).connect(delay);
+            
+            // 2. Aplica as configurações iniciais de Faders/Knobs
+            setupAllFaders();
+            
+            // 3. Carrega o Preset Inicial
+            loadPreset(presetNames[currentPresetIndex]);
+            
+            // 4. Configura o Sequencer
+            setupSequencer();
+
+            isReady = true;
+            document.getElementById('loading-overlay').style.opacity = '0';
+            setTimeout(() => document.getElementById('loading-overlay').style.display = 'none', 500);
+            updateKeyDisplay('PRONTO', 'up');
+        }
+
+        /**
+         * Carrega um preset, destrói o instrumento antigo e cria um novo.
+         * @param {string} presetName O nome do preset a ser carregado.
+         */
+        function loadPreset(presetName) {
+            if (currentSynth) {
+                currentSynth.dispose();
+            }
+
+            const preset = PRESETS[presetName];
+            
+            // Cria um novo instrumento
+            currentSynth = preset.instrument(preset.settings);
+
+            // Conecta o novo instrumento aos efeitos globais e, por fim, ao destino
+            currentSynth.chain(chorus, delay);
+            currentSynth.volume.value = preset.settings.volume || -12;
+
+            // Atualiza o Display
+            updateDisplay(presetName, preset.manufacturer, preset.type);
+
+            // Aplica os WETs iniciais (opcional: pode ser baseado no preset.settings ou no knob)
+            const reverbKnob = document.getElementById('knob-reverb');
+            const delayKnob = document.getElementById('knob-delay');
+            const chorusKnob = document.getElementById('knob-chorus');
+            
+            if (reverb) reverb.wet.value = parseFloat(reverbKnob.value);
+            if (delay) delay.wet.value = parseFloat(delayKnob.value);
+            if (chorus) chorus.wet.value = parseFloat(chorusKnob.value);
+
+            // Atualiza o select para refletir o preset atual
+            const select = document.getElementById('preset-select');
+            select.value = presetName;
+            currentPresetIndex = presetNames.indexOf(presetName);
+        }
+
+        /**
+         * Toca uma nota no sintetizador.
+         * @param {string} note A nota (ex: 'C4', 'A#3').
+         */
+        function playNote(note) {
+            if (!isReady || !currentSynth) return;
+            currentSynth.triggerAttack(note);
+            document.querySelector(`[data-note="${note}"]`).classList.add('active');
+        }
+
+        /**
+         * Para a execução de uma nota no sintetizador.
+         * @param {string} note A nota (ex: 'C4', 'A#3').
+         */
+        function stopNote(note) {
+            if (!isReady || !currentSynth) return;
+            currentSynth.triggerRelease(note);
+            // Verifica se o elemento existe antes de tentar remover a classe
+            const keyElement = document.querySelector(`[data-note="${note}"]`);
+            if (keyElement) {
+                keyElement.classList.remove('active');
+            }
+        }
+
+
+        // =========================================================================
+        // SEQUENCER (Com Adição da Função Limpar Padrão)
+        // =========================================================================
+
+        const SEQ_NOTES = ['C4', 'E4', 'G4', 'A4']; // Notas para o sequencer
+        const NUM_STEPS = 16;
+        const sequence = Array(NUM_STEPS).fill(null).map(() => Array(SEQ_NOTES.length).fill(false)); // Matriz 16x4
+        let currentStep = 0;
+        let running = false;
+        let loop = null;
+
+        /**
+         * Configura o Sequencer (loop, botões de UI).
+         */
+        function setupSequencer() {
+            const sequencerStepsElement = document.getElementById('sequencer-steps');
+            sequencerStepsElement.innerHTML = ''; // Limpa botões existentes
+
+            for (let i = 0; i < NUM_STEPS; i++) {
+                const stepColumn = document.createElement('div');
+                stepColumn.className = 'flex flex-col space-y-1 mr-1';
+                stepColumn.setAttribute('data-step-index', i);
+                
+                // Itera pelas notas para criar 4 botões por passo (coluna)
+                SEQ_NOTES.forEach((note, noteIndex) => {
+                    const button = document.createElement('button');
+                    button.className = 'w-5 h-5 bg-gray-600 rounded-sm hover:bg-gray-500 transition duration-100';
+                    button.setAttribute('data-step', i);
+                    button.setAttribute('data-note-index', noteIndex);
+                    button.addEventListener('click', () => {
+                        // Alterna o estado da nota naquele passo
+                        sequence[i][noteIndex] = !sequence[i][noteIndex];
+                        button.classList.toggle('step-active', sequence[i][noteIndex]);
+                    });
+                    stepColumn.appendChild(button);
+                });
+                sequencerStepsElement.appendChild(stepColumn);
+            }
+
+            // Configura o Tone.Loop
+            loop = new Tone.Loop(time => {
+                if (!running) return;
+
+                // 1. Toca o som (apenas para as notas marcadas no passo atual)
+                sequence[currentStep].forEach((isActive, noteIndex) => {
+                    if (isActive) {
+                        currentSynth.triggerAttackRelease(SEQ_NOTES[noteIndex], '8n', time);
+                    }
+                });
+
+                // 2. Atualiza a UI para o passo ativo (efeito visual)
+                const allSteps = document.querySelectorAll('[data-step-index]');
+                allSteps.forEach(stepEl => {
+                    stepEl.classList.remove('ring-2', 'ring-fca311', 'rounded');
+                });
+                document.querySelector(`[data-step-index="${currentStep}"]`).classList.add('ring-2', 'ring-fca311', 'rounded');
+
+                // 3. Move para o próximo passo
+                currentStep = (currentStep + 1) % NUM_STEPS;
+            }, '16n').start(0);
+
+            // Configura o Tempo
+            Tone.Transport.bpm.value = document.getElementById('tempo-range').value;
+            Tone.Transport.start();
+        }
+
+        /**
+         * Limpa todo o padrão do sequencer (matriz e UI).
+         */
+        function clearSequencer() {
+            sequence.forEach(step => step.fill(false));
+            document.querySelectorAll('[data-step-index] button').forEach(button => {
+                button.classList.remove('step-active');
+            });
+            console.log("Padrão do Sequencer Limpo.");
+        }
+
+
+        // =========================================================================
+        // CONTROLES DE UI / FADERS / DISPLAY
+        // =========================================================================
+
+        /**
+         * Atualiza o display LCD com o nome do preset e informações.
+         */
+        function updateDisplay(name, manufacturer, type) {
+            document.getElementById('display-preset-name').textContent = name.toUpperCase();
+            document.getElementById('display-preset-info').textContent = `${manufacturer} | ${type}`;
+            document.getElementById('lcd-display').classList.toggle('lcd-green', name.toLowerCase().includes('moog') || name.toLowerCase().includes('prophet'));
+            document.getElementById('lcd-display').classList.toggle('lcd-display', !name.toLowerCase().includes('moog') && !name.toLowerCase().includes('prophet'));
+        }
+        
+        /**
+         * Configura todos os event listeners para faders e knobs.
+         */
+        function setupAllFaders() {
+            // Volume Principal
+            document.getElementById('master-volume').addEventListener('input', (e) => {
+                if (!isReady) return;
+                Tone.Destination.volume.value = parseFloat(e.target.value);
+            });
+
+            // Reverb Wet
+            document.getElementById('knob-reverb').addEventListener('input', (e) => {
+                if (!isReady || !reverb) return;
+                reverb.wet.value = parseFloat(e.target.value);
+            });
+
+            // Delay Wet
+            document.getElementById('knob-delay').addEventListener('input', (e) => {
+                if (!isReady || !delay) return;
+                delay.wet.value = parseFloat(e.target.value);
+            });
+
+            // Chorus Wet
+            document.getElementById('knob-chorus').addEventListener('input', (e) => {
+                if (!isReady || !chorus) return;
+                chorus.wet.value = parseFloat(e.target.value);
+            });
+            
+            // Preset Selection
+            const select = document.getElementById('preset-select');
+            presetNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+            select.addEventListener('change', (e) => loadPreset(e.target.value));
+
+            document.getElementById('prev-preset').addEventListener('click', () => {
+                currentPresetIndex = (currentPresetIndex - 1 + presetNames.length) % presetNames.length;
+                loadPreset(presetNames[currentPresetIndex]);
+            });
+            document.getElementById('next-preset').addEventListener('click', () => {
+                currentPresetIndex = (currentPresetIndex + 1) % presetNames.length;
+                loadPreset(presetNames[currentPresetIndex]);
+            });
+            
+            // Sequencer Controls
+            const toggleSequenceButton = document.getElementById('toggle-sequence');
+            toggleSequenceButton.addEventListener('click', () => {
+                running = !running;
+                if (running) {
+                    toggleSequenceButton.textContent = 'Parar Sequência';
+                    toggleSequenceButton.classList.replace('bg-blue-600', 'bg-yellow-600');
+                } else {
+                    toggleSequenceButton.textContent = 'Tocar Sequência';
+                    toggleSequenceButton.classList.replace('bg-yellow-600', 'bg-blue-600');
+                    // Limpa o indicador visual do passo ativo
+                    document.querySelectorAll('[data-step-index]').forEach(stepEl => {
+                        stepEl.classList.remove('ring-2', 'ring-fca311', 'rounded');
+                    });
+                    currentStep = 0; // Reinicia o passo
+                }
+            });
+
+            // Sequencer Clear Button
+            document.getElementById('clear-sequence').addEventListener('click', clearSequencer);
+
+            // Sequencer Tempo/BPM
+            const tempoRange = document.getElementById('tempo-range');
+            const tempoDisplay = document.getElementById('tempo-display');
+            tempoRange.addEventListener('input', (e) => {
+                Tone.Transport.bpm.value = parseFloat(e.target.value);
+                tempoDisplay.textContent = e.target.value;
+            });
+        }
+        
+        /**
+         * Renderiza as teclas do piano (C2 a F#7).
+         */
+        function renderPiano() {
+            const pianoElement = document.getElementById('piano-keyboard');
+            pianoElement.innerHTML = ''; // Limpa o conteúdo existente
+            
+            // Define a ordem das notas (67 teclas: C2 a F#7)
+            const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            const OCTAVES = [2, 3, 4, 5, 6, 7];
+            const allNotes = [];
+
+            // Gera todas as 67 notas
+            for (let oct of OCTAVES) {
+                for (let note of NOTES) {
+                    const fullNote = note + oct;
+                    if (fullNote === 'C2' || (oct >= 2 && oct <= 6) || fullNote === 'C7' || fullNote === 'C#7' || fullNote === 'D7' || fullNote === 'D#7' || fullNote === 'E7' || fullNote === 'F7' || fullNote === 'F#7') {
+                         allNotes.push(fullNote);
+                         if (fullNote === 'F#7') break;
+                    }
+                }
+            }
+
+            // Cria os elementos das teclas
+            allNotes.forEach(note => {
+                const isSharp = note.includes('#');
+                const keyElement = document.createElement('div');
+                keyElement.setAttribute('data-note', note);
+                keyElement.classList.add('piano-key', 'transition-all');
+                
+                if (isSharp) {
+                    keyElement.classList.add('black-key');
+                } else {
+                    keyElement.classList.add('white-key');
+                }
+                
+                // Exibe o nome da nota na tecla branca ou a oitava na preta
+                if (!isSharp) {
+                    keyElement.innerHTML = `<span class="text-xs mb-1 text-gray-800">${note}</span>`;
+                }
+
+                // Eventos de Mouse
+                keyElement.addEventListener('mousedown', () => playNote(note));
+                keyElement.addEventListener('mouseup', () => stopNote(note));
+                keyElement.addEventListener('mouseleave', () => stopNote(note)); // Importante para arrastar o mouse
+                
+                // Eventos de Toque (Touch)
+                keyElement.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (Tone.context.state !== 'running') {
+                        Tone.start().then(initializeAudio);
+                    } else if (!isReady) {
+                        initializeAudio();
+                    }
+                    playNote(note);
+                }, { passive: false });
+
+                keyElement.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    stopNote(note);
+                }, { passive: false });
+
+                pianoElement.appendChild(keyElement);
+            });
+
+            // Adiciona um espaçador no final para o layout
+            const spacer = document.createElement('div');
+            spacer.className = 'w-1/2';
+            pianoElement.appendChild(spacer);
+        }
+
+        /**
+         * Atualiza o visor de status na parte inferior.
+         */
+        function updateKeyDisplay(status, eventType) {
+            const display = document.getElementById('key-display-status');
+            const colorClass = eventType === 'up' ? 'text-gray-400' : 'text-fca311';
+            display.className = `mt-4 text-center text-sm font-semibold transition duration-100 ${colorClass}`;
+            display.textContent = `STATUS: ${status}`;
+        }
+
+        // =========================================================================
+        // Event Listeners (Teclado do Computador)
+        // =========================================================================
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            if (note && !keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.add(key);
+                playNote(note);
+                updateKeyDisplay(`Tocando: ${note} (${key.toUpperCase()})`, 'down');
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            if (note && keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.delete(key);
+                stopNote(note);
+                updateKeyDisplay('PRONTO', 'up');
+            }
+        });
+
+
+        // =========================================================================
+        // Inicialização Global
+        // =========================================================================
+
+        // Inicia o contexto de áudio no primeiro clique no corpo do documento (necessário para navegadores)
+        document.body.addEventListener('click', () => {
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(initializeAudio); 
+            } else if (!isReady) {
+                initializeAudio();
+            }
+        }, { once: true });
+
+        // Inicialização: Renderiza a UI do piano
+        window.onload = () => {
+            renderPiano();
+            updateKeyDisplay('CLIQUE para iniciar o áudio', 'up');
+            // initializeAudio é chamado pelo primeiro clique devido às restrições do navegador
+        };
+
+    </script>
+</body>
+</html>

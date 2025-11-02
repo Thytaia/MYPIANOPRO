@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Digital Yamaha Heritage (50 Presets FM/Hybrid)</title>
+    <!-- Tone.js v14.8.49: Versão estável que suporta todos os efeitos e synths -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <!-- Carrega Tailwind CSS para estilização responsiva e moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter como padrão */
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Estilos Customizados do Piano */
+        .piano-key {
+            transition: background-color 0.05s ease, transform 0.05s ease;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-weight: 500;
+        }
+
+        /* CHAVES BRANCAS */
+        .white-key {
+            width: 30px; 
+            height: 150px; 
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-right: none;
+            z-index: 10;
+        }
+
+        /* CHAVES PRETAS */
+        .black-key {
+            width: 20px; 
+            height: 90px; 
+            background-color: #1a1a1a;
+            margin: 0 -10px;
+            z-index: 20;
+            border-radius: 0 0 4px 4px;
+        }
+
+        /* ESTADO ATIVO (AO TOCAR) */
+        .key-active.white-key {
+            background-color: #cbd5e1; /* Cinza claro */
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .key-active.black-key {
+            background-color: #4a4a4a; /* Cinza escuro */
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Faders - Estilo para barras de range */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 flex flex-col items-center">
+
+    <div class="max-w-6xl w-full space-y-6">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Yamaha Digital Synth Heritage</h1>
+
+        <!-- Controles de Predefinição e Modo -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-blue-200">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Preset Principal (Synth Main) -->
+                <div class="space-y-2">
+                    <label for="preset-main" class="block text-sm font-medium text-gray-700">Preset Principal (Main):</label>
+                    <select id="preset-main" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-gray-800"></select>
+                </div>
+
+                <!-- Preset de Camada (Synth Layer) -->
+                <div class="space-y-2">
+                    <label for="preset-layer" class="block text-sm font-medium text-gray-700">Preset de Camada (Layer):</label>
+                    <select id="preset-layer" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-gray-800"></select>
+                </div>
+
+                <!-- Modos de Reprodução -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Modo:</label>
+                    <div class="flex space-x-2">
+                        <button id="mode-single" class="mode-btn px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150">Único</button>
+                        <button id="mode-layer" class="mode-btn px-4 py-2 bg-gray-300 text-gray-700 font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150">Camada</button>
+                        <button id="mode-split" class="mode-btn px-4 py-2 bg-gray-300 text-gray-700 font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150">Divisão (Split)</button>
+                    </div>
+                </div>
+            </div>
+            <p id="mode-info" class="mt-4 text-sm text-blue-700 font-medium"></p>
+        </div>
+
+        <!-- Controles de Efeitos (Faders) -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-yellow-200">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Controles Globais e Efeitos</h2>
+            <div id="fader-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                <!-- Faders serão injetados aqui via JS -->
+            </div>
+        </div>
+
+        <!-- Visor de Tecla Pressionada (Melhor Experiência Móvel/Teclado) -->
+        <div class="flex justify-center">
+            <div class="bg-gray-800 text-white p-3 rounded-xl shadow-inner min-w-[200px] text-center">
+                <p id="key-display" class="font-mono text-lg transition duration-100 ease-in-out"></p>
+            </div>
+        </div>
+
+        <!-- Teclado do Piano (C2 a F#7) -->
+        <div id="piano" class="flex relative justify-center bg-gray-700 p-4 rounded-xl shadow-2xl overflow-x-auto">
+            <!-- As teclas são renderizadas por JavaScript -->
+        </div>
+
+        <p class="text-xs text-center text-gray-500 mt-4">Pressione para iniciar o áudio. Suporte completo a Teclado QWERTY.</p>
+    </div>
+
+    <script>
+        // Variáveis Globais do Tone.js e Estado do Aplicativo
+        let isReady = false;
+        let authReady = false; // Não usado no momento, mas boa prática
+        let synthMain, synthLayer, synthSplit;
+        let limiter, reverb, delay, chorus, volumeControl;
+        const activeKeys = new Map();
+        const MODES = {
+            SINGLE: 'single',
+            LAYER: 'layer',
+            SPLIT: 'split'
+        };
+        let currentMode = MODES.SINGLE;
+        const SPLIT_POINT_NOTE = 'C4'; // Ponto de divisão central
+
+        // Mapeamento de notas para teclado QWERTY
+        const KEY_MAP = {
+            'a': 'C3', 'w': 'C#3', 's': 'D3', 'e': 'D#3', 'd': 'E3', 'f': 'F3',
+            't': 'F#3', 'g': 'G3', 'y': 'G#3', 'h': 'A3', 'u': 'A#3', 'j': 'B3',
+            'k': 'C4', 'o': 'C#4', 'l': 'D4', 'p': 'D#4', ';': 'E4', "'": 'F4',
+            '[': 'F#4', ']': 'G4', '\\': 'G#4', 'enter': 'A4' // Simplesmente mapeando para alguma tecla
+        };
+
+        // =========================================================================
+        // 50 PRESETS FOCADOS EM EMULAÇÃO YAMAHA FM (DX7, SY, MOTIF, MONTAGE/MODX)
+        // O campo 'synthType' define o motor de síntese interno (FMSynth, AMSynth, DuoSynth, Synth)
+        // =========================================================================
+        const PRESETS = {
+            // --- 1. DX7 FM Classics (Herança do DX7) ---
+            "E. PIANO 1 (Full Tines)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 12, envelope: { attack: 0.001, decay: 0.4, sustain: 0.1, release: 0.8 }, modulationEnvelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.5 }, modulation: { type: "square" }, carrier: { type: "sine" } } },
+            "Lately Bass (TX81Z)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.8, modulationIndex: 8, envelope: { attack: 0.005, decay: 0.1, sustain: 0.01, release: 0.15 }, modulationEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.0, release: 0.1 }, modulation: { type: "sawtooth" }, carrier: { type: "square" } } },
+            "MARIMBA DX7": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 2.0, modulationIndex: 5, envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.5 }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.5 }, modulation: { type: "sine" }, carrier: { type: "triangle" } } },
+            "TUB BELLS (Sineta)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.4, modulationIndex: 15, envelope: { attack: 0.001, decay: 1.5, sustain: 0, release: 2.0 }, modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.5 }, modulation: { type: "sine" }, carrier: { type: "triangle" } } },
+            "BRASS 1 DX": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 10, envelope: { attack: 0.05, decay: 0.5, sustain: 0.2, release: 0.5 }, modulationEnvelope: { attack: 0.05, decay: 0.4, sustain: 0.1, release: 0.4 }, modulation: { type: "square" }, carrier: { type: "sawtooth" } } },
+            "BASS 1 DX (Percussivo)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.5, modulationIndex: 5, envelope: { attack: 0.001, decay: 0.2, sustain: 0.05, release: 0.2 }, modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 }, modulation: { type: "triangle" }, carrier: { type: "sine" } } },
+            "SYN-LEAD Clássico": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.5, modulationIndex: 10, envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.5 }, modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.5 }, modulation: { type: "sawtooth" }, carrier: { type: "square" } } },
+            "CLAVINET FM": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 3.0, modulationIndex: 1, envelope: { attack: 0.001, decay: 0.2, sustain: 0.0, release: 0.1 }, modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 }, modulation: { type: "square" }, carrier: { type: "sawtooth" } } },
+            "VIBES DX (Vibráfone)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 8, envelope: { attack: 0.001, decay: 1.2, sustain: 0, release: 1.5 }, modulationEnvelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 1.0 }, modulation: { type: "sine" }, carrier: { type: "triangle" } } },
+            "ORGAN FM Clássico": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.1 }, modulationEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.5, release: 0.05 }, modulation: { type: "triangle" }, carrier: { type: "sine" } } },
+            
+            // --- 2. Variações de E. Piano FM ---
+            "E. PIANO Tines Suave": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 8, envelope: { attack: 0.01, decay: 0.6, sustain: 0.2, release: 1.0 } } },
+            "E. PIANO Wurlitzer FM": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.5, modulationIndex: 10, envelope: { attack: 0.001, decay: 0.5, sustain: 0.1, release: 0.8 } } },
+            "E. PIANO Bright Stack": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.5, modulationIndex: 15, envelope: { attack: 0.001, decay: 0.3, sustain: 0.1, release: 0.6 }, modulation: { type: "square" } } },
+            "E. PIANO Lento (Pad)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 7, envelope: { attack: 0.1, decay: 1.0, sustain: 0.4, release: 2.0 } } },
+            
+            // --- 3. Leads SY/Motif/Montage (FM-X / Hybrid Emu) ---
+            "Montage Power Lead (Duo)": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 0.5 } }, voice1: { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.8 } }, vibratoAmount: 0.5, vibratoRate: 5 } },
+            "SY99 Saw Lead": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.5 }, filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.3, basePath: 1000, octaves: 4 } } },
+            "Motif Solo Lead": { type: "PolySynth", synthType: "AMSynth", options: { carrier: { oscillator: { type: "square" } }, modulator: { oscillator: { type: "triangle" } }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.6 } } },
+            "Analog Lead Clássico": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { detune: -10 }, voice1: { detune: 10 }, filter: { Q: 2, type: "lowpass" }, filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 0.5, octaves: 3 } } },
+            "Jump Lead Bright": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.5, modulationIndex: 20, envelope: { attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.3 }, carrier: { type: "sawtooth" } } },
+            "Trance Gate Lead Emu": { type: "PolySynth", synthType: "AMSynth", options: { carrier: { oscillator: { type: "sawtooth" } }, modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.0, release: 0.1 } } },
+
+            // --- 4. Pads/Texturas (AWM2/FM-X Textures) ---
+            "Complex Pad Montage": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.2, modulationIndex: 5, envelope: { attack: 1.5, decay: 4.0, sustain: 0.5, release: 5.0 }, carrier: { type: "triangle" } } },
+            "Warm Pad SY77": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.5, decay: 1.0, sustain: 0.7, release: 2.0 }, filter: { type: "lowpass", frequency: 500 } } },
+            "FM-X Glass Pad": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 3.0, modulationIndex: 2, envelope: { attack: 0.8, decay: 2.5, sustain: 0.3, release: 3.0 }, modulation: { type: "sine" } } },
+            "Worship Pad Hybrid (Duo)": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { detune: -5, envelope: { attack: 1.0, decay: 1.5, sustain: 0.8, release: 4.0 } }, voice1: { detune: 5, envelope: { attack: 1.0, decay: 2.0, sustain: 0.9, release: 5.0 } } } },
+            "Shimmer Pad FM": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.1, modulationIndex: 1, envelope: { attack: 2.0, decay: 3.0, sustain: 0.6, release: 6.0 }, modulation: { type: "triangle" } } },
+            "Synth String Ensemble": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.3, decay: 1.0, sustain: 0.8, release: 1.5 }, filter: { type: "lowpass", frequency: 800 } } },
+            
+            // --- 5. Baixos Sintéticos (FM/Analog) ---
+            "Baixo Sub Grave FM": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.1, modulationIndex: 0.5, envelope: { attack: 0.005, decay: 0.1, sustain: 1.0, release: 0.1 }, carrier: { type: "sine" } } },
+            "Baixo Fretless FM": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 1.5, envelope: { attack: 0.05, decay: 0.5, sustain: 0.8, release: 0.5 }, portamento: 0.05 } },
+            "Baixo Hammer DX": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 2.0, modulationIndex: 10, envelope: { attack: 0.001, decay: 0.2, sustain: 0.0, release: 0.2 } } },
+            "Baixo Vintage Square": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.8, release: 0.4 } } },
+            
+            // --- 6. Percussão/Mallets (DX7 Forte) ---
+            "Timpani FM": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 30, envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.5 }, carrier: { type: "noise" } } },
+            "C Sino Tibetano": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 2.5, modulationIndex: 12, envelope: { attack: 0.01, decay: 3.0, sustain: 0, release: 4.0 }, carrier: { type: "sawtooth" } } },
+            "Koto FM (Pluck)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 3.5, modulationIndex: 1, envelope: { attack: 0.001, decay: 0.5, sustain: 0.0, release: 0.2 }, carrier: { type: "triangle" } } },
+            "Log Drum FM": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.5, modulationIndex: 20, envelope: { attack: 0.001, decay: 0.7, sustain: 0.0, release: 0.5 } } },
+            
+            // --- 7. Emulação de Piano Acústico (Para fins didáticos do FM) ---
+            "Piano Acústico Emu (Motif/FM)": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.5, modulationIndex: 1, envelope: { attack: 0.005, decay: 1.5, sustain: 0.0, release: 1.5 }, carrier: { type: "triangle" } } },
+            "CFX Grand Emu (Synth)": { type: "PolySynth", synthType: "Synth", options: { envelope: { attack: 0.002, decay: 1.0, sustain: 0.0, release: 1.5 }, filter: { type: "lowpass", frequency: 2000 } } },
+
+            // --- 8. Mais 20 Variações de FMSynth/Synth para totalizar 50 ---
+            "FM E. PIANO Rhodes Deno": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 9, envelope: { attack: 0.001, decay: 0.6, sustain: 0.05, release: 1.0 } } },
+            "FM E. PIANO Suitcase": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 10, envelope: { attack: 0.001, decay: 0.5, sustain: 0.08, release: 0.9 } } },
+            "FM BELL Bright": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 4.0, modulationIndex: 10, envelope: { attack: 0.001, decay: 1.0, sustain: 0.0, release: 1.2 } } },
+            "FM GLASS Harmonics": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 5.0, modulationIndex: 15, envelope: { attack: 0.01, decay: 0.9, sustain: 0.0, release: 1.5 } } },
+            "FM PAD Ice Cave": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.5, modulationIndex: 2, envelope: { attack: 3.0, decay: 3.0, sustain: 0.3, release: 5.0 } } },
+            "FM PAD Resonant": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.8, modulationIndex: 8, envelope: { attack: 1.0, decay: 2.0, sustain: 0.5, release: 4.0 } } },
+            "FM CHORD Stab": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 10, envelope: { attack: 0.001, decay: 0.3, sustain: 0.0, release: 0.5 } } },
+            "FM BRASS Soft": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 5, envelope: { attack: 0.1, decay: 0.6, sustain: 0.5, release: 0.8 } } },
+            "FM FLUTE Breath": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.1, modulationIndex: 0.5, envelope: { attack: 0.05, decay: 0.5, sustain: 0.7, release: 0.5 } } },
+            "FM HARP Pluck": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 4.0, modulationIndex: 2, envelope: { attack: 0.001, decay: 1.0, sustain: 0.0, release: 0.8 } } },
+            "SYNTH Saw Pad": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.8, decay: 2.0, sustain: 0.7, release: 3.0 } } },
+            "SYNTH Square Bass": { type: "PolySynth", synthType: "Synth", options: { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.9, release: 0.4 } } },
+            "DUO Lead Wide": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { detune: -15 }, voice1: { detune: 15 }, portamento: 0.01 } },
+            "DUO Pad Deep": { type: "PolySynth", synthType: "DuoSynth", options: { voice0: { envelope: { attack: 1.2, release: 4.0 } }, voice1: { envelope: { attack: 1.5, release: 5.0 } } } },
+            "AM Lead Pulse": { type: "PolySynth", synthType: "AMSynth", options: { carrier: { oscillator: { type: "sawtooth" } }, modulation: { type: "square" }, modulationEnvelope: { decay: 0.2, sustain: 0.1 } } },
+            "AM Pad LoFi": { type: "PolySynth", synthType: "AMSynth", options: { carrier: { oscillator: { type: "square" } }, modulator: { oscillator: { type: "sawtooth" } }, envelope: { attack: 1.0, release: 3.0 } } },
+            "FM BASS Hardcore": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 5.0, modulationIndex: 50, envelope: { attack: 0.001, decay: 0.1, sustain: 0.0, release: 0.1 } } },
+            "FM E. PIANO Dark": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 0.8, modulationIndex: 6, envelope: { attack: 0.05, decay: 0.8, sustain: 0.2, release: 1.0 } } },
+            "FM LEAD Whistle": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 8.0, modulationIndex: 2, envelope: { attack: 0.01, decay: 0.5, sustain: 0.8, release: 0.5 } } },
+            "FM ORCHESTRA Hit": { type: "PolySynth", synthType: "FMSynth", options: { harmonicity: 1.0, modulationIndex: 1, envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 1.0 }, modulation: { type: "sawtooth" }, carrier: { type: "square" } } },
+        };
+
+        // =========================================================================
+        // Funções de Inicialização e Lógica
+        // =========================================================================
+
+        /**
+         * Inicializa o contexto de áudio, os sintetizadores, os efeitos e a interface.
+         */
+        async function initializeAudio() {
+            if (isReady) return;
+            isReady = true;
+
+            // 1. Definição da Cadeia de Efeitos (Effects Chain)
+            limiter = new Tone.Limiter(-6).toDestination(); // Limiter no final para evitar clipping
+            volumeControl = new Tone.Volume(-10).connect(limiter); // Controle de volume principal
+            reverb = new Tone.Reverb(2).connect(volumeControl); // Reverb padrão
+            delay = new Tone.FeedbackDelay(0.5, 0.5).connect(reverb); // Delay com feedback
+            chorus = new Tone.Chorus(4, 2.5, 0.5).connect(delay); // Chorus para espessamento
+
+            // 2. Inicialização dos Sintetizadores
+            // Os Synths Main, Layer e Split usam a mesma cadeia de efeitos (Chorus -> Delay -> Reverb)
+
+            // Inicializa Synth Main (Usado em todos os modos)
+            synthMain = new Tone.PolySynth(Tone.Synth).connect(chorus);
+            
+            // Inicializa Synth Layer (Substitui Sampler para evitar dependências)
+            // Será reconfigurado no applyPreset
+            synthLayer = new Tone.PolySynth(Tone.Synth).connect(chorus);
+            
+            // Inicializa Synth Split (Usado na Divisão)
+            // Será reconfigurado no applyPreset
+            synthSplit = new Tone.PolySynth(Tone.Synth).connect(chorus);
+
+            console.log("Audio e Synths inicializados.");
+
+            // 3. Setup Inicial da UI
+            populatePresets();
+            setupModeButtons();
+            
+            // 4. Configura os faders APÓS os efeitos serem inicializados
+            setupAllFaders();
+            
+            // 5. Aplica os presets iniciais
+            const initialPreset = Object.keys(PRESETS)[0];
+            document.getElementById('preset-main').value = initialPreset;
+            document.getElementById('preset-layer').value = initialPreset;
+            applyPreset('main', initialPreset);
+            applyPreset('layer', initialPreset);
+            applyPreset('split', initialPreset);
+            setMode(MODES.SINGLE);
+        }
+
+        /**
+         * Preenche os dropdowns de presets com os 50 presets definidos.
+         */
+        function populatePresets() {
+            const presetSelectMain = document.getElementById('preset-main');
+            const presetSelectLayer = document.getElementById('preset-layer');
+
+            Object.keys(PRESETS).forEach(name => {
+                const optionMain = document.createElement('option');
+                optionMain.value = name;
+                optionMain.textContent = name;
+                presetSelectMain.appendChild(optionMain);
+
+                const optionLayer = document.createElement('option');
+                optionLayer.value = name;
+                optionLayer.textContent = name;
+                presetSelectLayer.appendChild(optionLayer);
+            });
+            
+            // Adiciona listeners para mudança de preset
+            presetSelectMain.addEventListener('change', (e) => applyPreset('main', e.target.value));
+            presetSelectLayer.addEventListener('change', (e) => {
+                // Aplica o preset da camada tanto ao layer quanto ao split
+                applyPreset('layer', e.target.value);
+                applyPreset('split', e.target.value);
+            });
+        }
+        
+        /**
+         * Aplica um preset a um dos sintetizadores (main, layer, split).
+         * @param {string} target 'main', 'layer', ou 'split'
+         * @param {string} presetName O nome do preset em PRESETS
+         */
+        function applyPreset(target, presetName) {
+            const preset = PRESETS[presetName];
+            let targetSynth;
+            let targetNode;
+
+            switch (target) {
+                case 'main': targetNode = synthMain; targetSynth = Tone.PolySynth; break;
+                case 'layer': targetNode = synthLayer; targetSynth = Tone.PolySynth; break;
+                case 'split': targetNode = synthSplit; targetSynth = Tone.PolySynth; break;
+                default: return;
+            }
+
+            if (targetNode) {
+                // Desconecta e dispõe o synth anterior para evitar vazamento de memória e reconfiguração
+                targetNode.dispose();
+            }
+
+            // O PolySynth é o container, e o tipo de synth (FMSynth, Synth, etc.) é o motor interno
+            const SynthConstructor = Tone[preset.synthType || "Synth"]; // Padrão para Tone.Synth
+            
+            // Cria o novo PolySynth com o motor de síntese correto
+            const newSynth = new Tone.PolySynth(SynthConstructor, preset.options).connect(chorus);
+
+            switch (target) {
+                case 'main': synthMain = newSynth; break;
+                case 'layer': synthLayer = newSynth; break;
+                case 'split': synthSplit = newSynth; break;
+            }
+
+            console.log(`Preset '${presetName}' (${preset.synthType}) aplicado ao synth ${target}.`);
+        }
+
+        /**
+         * Define o modo de reprodução e atualiza a UI.
+         * @param {string} mode O modo a ser definido (MODES.SINGLE, MODES.LAYER, MODES.SPLIT)
+         */
+        function setMode(mode) {
+            currentMode = mode;
+            const infoElement = document.getElementById('mode-info');
+            
+            // Atualiza os botões
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                btn.classList.add('bg-gray-300', 'text-gray-700', 'hover:bg-gray-400');
+                if (btn.id === `mode-${mode}`) {
+                    btn.classList.remove('bg-gray-300', 'text-gray-700', 'hover:bg-gray-400');
+                    btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                }
+            });
+
+            // Atualiza a info
+            if (mode === MODES.SINGLE) {
+                infoElement.textContent = "Modo Único: Apenas o Preset Principal está ativo.";
+            } else if (mode === MODES.LAYER) {
+                infoElement.textContent = "Modo Camada: Os Presets Principal e Camada tocam juntos.";
+            } else if (mode === MODES.SPLIT) {
+                infoElement.textContent = `Modo Divisão: Notas abaixo de C4 usam Preset Camada; Notas C4 e acima usam Preset Principal.`;
+            }
+        }
+
+        function setupModeButtons() {
+            document.getElementById('mode-single').addEventListener('click', () => setMode(MODES.SINGLE));
+            document.getElementById('mode-layer').addEventListener('click', () => setMode(MODES.LAYER));
+            document.getElementById('mode-split').addEventListener('click', () => setMode(MODES.SPLIT));
+        }
+
+
+        // =========================================================================
+        // Lógica de Toque e Teclado
+        // =========================================================================
+
+        /**
+         * Inicia a reprodução de uma nota, gerenciando os modos (Single, Layer, Split).
+         * @param {string} note A nota MIDI (ex: C4)
+         */
+        function playNote(note) {
+            if (!isReady || activeKeys.has(note)) return;
+
+            // Análise da nota para o modo Split
+            const noteMidi = Tone.Frequency(note).toMidi();
+            const splitMidi = Tone.Frequency(SPLIT_POINT_NOTE).toMidi();
+            const isBelowSplit = noteMidi < splitMidi;
+
+            if (currentMode === MODES.SINGLE) {
+                synthMain.triggerAttack(note);
+            } else if (currentMode === MODES.LAYER) {
+                synthMain.triggerAttack(note);
+                synthLayer.triggerAttack(note);
+            } else if (currentMode === MODES.SPLIT) {
+                if (isBelowSplit) {
+                    synthSplit.triggerAttack(note); // Preset Layer/Split (notas baixas)
+                } else {
+                    synthMain.triggerAttack(note); // Preset Main (notas altas)
+                }
+            }
+
+            activeKeys.set(note, Date.now());
+            updateKeyDisplay(note, 'down');
+            updateKeyUI(note, true);
+        }
+
+        /**
+         * Para a reprodução de uma nota.
+         * @param {string} note A nota MIDI (ex: C4)
+         */
+        function stopNote(note) {
+            if (!activeKeys.has(note)) return;
+
+            const noteMidi = Tone.Frequency(note).toMidi();
+            const splitMidi = Tone.Frequency(SPLIT_POINT_NOTE).toMidi();
+            const isBelowSplit = noteMidi < splitMidi;
+
+            if (currentMode === MODES.SINGLE) {
+                synthMain.triggerRelease(note);
+            } else if (currentMode === MODES.LAYER) {
+                synthMain.triggerRelease(note);
+                synthLayer.triggerRelease(note);
+            } else if (currentMode === MODES.SPLIT) {
+                if (isBelowSplit) {
+                    synthSplit.triggerRelease(note);
+                } else {
+                    synthMain.triggerRelease(note);
+                }
+            }
+
+            activeKeys.delete(note);
+            updateKeyDisplay(note, 'up');
+            updateKeyUI(note, false);
+        }
+
+        /**
+         * Atualiza o estado visual de uma tecla (pressionada/solta).
+         */
+        function updateKeyUI(note, isActive) {
+            const keyElement = document.querySelector(`[data-note="${note}"]`);
+            if (keyElement) {
+                if (isActive) {
+                    keyElement.classList.add('key-active');
+                } else {
+                    keyElement.classList.remove('key-active');
+                }
+            }
+        }
+
+        /**
+         * Atualiza o visor de teclas tocadas.
+         */
+        function updateKeyDisplay(note, state) {
+            const display = document.getElementById('key-display');
+            if (state === 'down') {
+                display.textContent = `TOCANDO: ${note}`;
+                display.style.backgroundColor = '#10b981'; // Cor verde para nota on
+            } else if (activeKeys.size > 0) {
+                display.textContent = `TOCANDO: ${Array.from(activeKeys.keys()).join(', ')}`;
+            } else {
+                display.textContent = 'PRONTO';
+                display.style.backgroundColor = '#4b5563'; // Cor padrão
+            }
+        }
+
+
+        // =========================================================================
+        // Faders e Efeitos
+        // =========================================================================
+
+        const FADERS = [
+            { id: 'volume', label: 'Volume (dB)', target: 'volumeControl', property: 'volume', min: -40, max: 0, step: 1, defaultValue: -10 },
+            { id: 'reverb', label: 'Reverb (Mix)', target: 'reverb', property: 'wet', min: 0, max: 1, step: 0.05, defaultValue: 0.5 },
+            { id: 'delay', label: 'Delay (Mix)', target: 'delay', property: 'wet', min: 0, max: 1, step: 0.05, defaultValue: 0.5 },
+            { id: 'chorus', label: 'Chorus (Mix)', target: 'chorus', property: 'wet', min: 0, max: 1, step: 0.05, defaultValue: 0.5 },
+            { id: 'speed', label: 'Delay Time (s)', target: 'delay', property: 'delayTime', min: 0.1, max: 1, step: 0.05, defaultValue: 0.5 },
+            { id: 'feedback', label: 'Delay Feedback', target: 'delay', property: 'feedback', min: 0, max: 0.9, step: 0.05, defaultValue: 0.5 },
+        ];
+
+        /**
+         * Configura todos os faders na UI e adiciona listeners.
+         */
+        function setupAllFaders() {
+            const container = document.getElementById('fader-container');
+            
+            FADERS.forEach(fader => {
+                const div = document.createElement('div');
+                div.className = "flex flex-col space-y-1";
+                
+                // Verifica se o objeto de destino existe
+                let targetObject;
+                if (fader.target === 'volumeControl') {
+                    targetObject = volumeControl;
+                } else if (fader.target === 'reverb') {
+                    targetObject = reverb;
+                } else if (fader.target === 'delay') {
+                    targetObject = delay;
+                } else if (fader.target === 'chorus') {
+                    targetObject = chorus;
+                }
+                
+                // Se o objeto não foi inicializado, usa o valor padrão
+                let currentValue = fader.defaultValue;
+                if (targetObject && targetObject.get) {
+                    try {
+                        currentValue = targetObject.get()[fader.property];
+                    } catch (e) {
+                        console.warn(`Não foi possível obter valor para ${fader.id}, usando padrão:`, fader.defaultValue);
+                        currentValue = fader.defaultValue;
+                    }
+                }
+                
+                div.innerHTML = `
+                    <label for="${fader.id}" class="text-xs font-semibold text-gray-600">${fader.label}</label>
+                    <input type="range" id="${fader.id}" min="${fader.min}" max="${fader.max}" step="${fader.step}" 
+                           value="${currentValue}" class="h-2">
+                    <span id="${fader.id}-value" class="text-xs text-gray-500">${currentValue.toFixed(2)}</span>
+                `;
+                container.appendChild(div);
+
+                const input = div.querySelector(`#${fader.id}`);
+                const valueSpan = div.querySelector(`#${fader.id}-value`);
+
+                input.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    
+                    // Atualiza o objeto de destino correspondente
+                    if (fader.target === 'volumeControl' && volumeControl) {
+                        volumeControl.set({ [fader.property]: value });
+                    } else if (fader.target === 'reverb' && reverb) {
+                        reverb.set({ [fader.property]: value });
+                    } else if (fader.target === 'delay' && delay) {
+                        delay.set({ [fader.property]: value });
+                    } else if (fader.target === 'chorus' && chorus) {
+                        chorus.set({ [fader.property]: value });
+                    }
+                    
+                    valueSpan.textContent = value.toFixed(fader.step.toString().includes('.') ? 2 : 0);
+                });
+            });
+        }
+
+        // =========================================================================
+        // Geração da UI do Piano
+        // =========================================================================
+
+        /**
+         * Gera o array de notas para o piano (C2 a F#7).
+         */
+        function generateNotes() {
+            const notes = [];
+            const startOctave = 2;
+            const endOctave = 7;
+            const scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+            for (let octave = startOctave; octave <= endOctave; octave++) {
+                scale.forEach(noteName => {
+                    const fullNote = noteName + octave;
+                    notes.push(fullNote);
+                });
+            }
+            // Apenas o F#7 da última oitava é adicionado
+            return notes.slice(0, notes.indexOf('G7')); 
+        }
+
+        /**
+         * Renderiza o piano completo (C2 a F#7).
+         */
+        function renderPiano() {
+            const pianoElement = document.getElementById('piano');
+            const notes = generateNotes();
+            
+            // Adiciona um invólucro para o overflow no mobile
+            const keyContainer = document.createElement('div');
+            keyContainer.className = "flex relative h-[150px]";
+
+            notes.forEach(note => {
+                const isBlack = note.includes('#');
+                const keyElement = document.createElement('div');
+                keyElement.classList.add('piano-key', isBlack ? 'black-key' : 'white-key');
+                keyElement.setAttribute('data-note', note);
+                keyElement.setAttribute('id', `key-${note}`);
+
+                // Adiciona o nome da nota (apenas para as C's ou B's para não poluir)
+                if (!isBlack && (note.includes('C') || note.includes('B'))) {
+                    keyElement.innerHTML = `<span class="mb-1 text-xs text-gray-600">${note}</span>`;
+                }
+
+                // Adiciona listeners de mouse/toque
+                keyElement.addEventListener('mousedown', () => playNote(note));
+                keyElement.addEventListener('mouseup', () => stopNote(note));
+                keyElement.addEventListener('mouseleave', () => stopNote(note));
+                keyContainer.appendChild(keyElement);
+            });
+
+            pianoElement.appendChild(keyContainer);
+            setupTouchEvents(pianoElement);
+        }
+
+        /**
+         * Configura eventos de toque (Touch) para melhor suporte móvel.
+         */
+        function setupTouchEvents(pianoElement) {
+            // Suporte a toque
+            pianoElement.addEventListener('touchstart', (event) => {
+                // Inicia o áudio se necessário
+                if (Tone.context.state !== 'running') {
+                    Tone.start().then(initializeAudio);
+                } else if (!isReady) {
+                    initializeAudio();
+                }
+                
+                // Toca as notas que estão sendo tocadas
+                Array.from(event.touches).forEach(touch => {
+                    // Elemento na posição do toque
+                    const keyElement = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.piano-key');
+                    if (keyElement) {
+                        const note = keyElement.getAttribute('data-note');
+                        playNote(note);
+                    }
+                });
+            }, { passive: true }); // Usando passive: true para scroll otimizado, se possível
+
+            // Parar todas as notas ativas no final do toque (simplificado)
+            pianoElement.addEventListener('touchend', (event) => {
+                // Parar todas as notas ativas
+                activeKeys.forEach((timestamp, note) => {
+                    stopNote(note);
+                });
+            }, { passive: true });
+        }
+
+
+        // =========================================================================
+        // Eventos de Teclado QWERTY
+        // =========================================================================
+
+        let keysDown = new Set();
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+
+            // Inicia o áudio na primeira tecla
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(initializeAudio);
+            } else if (!isReady) {
+                initializeAudio();
+            }
+
+            if (note && !keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.add(key);
+                playNote(note);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const note = KEY_MAP[key];
+            if (note && keysDown.has(key)) {
+                e.preventDefault();
+                keysDown.delete(key);
+                stopNote(note);
+            }
+        });
+
+
+        // =========================================================================
+        // Inicialização Global
+        // =========================================================================
+
+        // Inicia o contexto de áudio no primeiro clique no corpo do documento (necessário para navegadores)
+        document.body.addEventListener('click', () => {
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(initializeAudio); 
+            } else if (!isReady) {
+                // Caso o start() tenha sido chamado, mas o initializeAudio() ainda não rodou
+                initializeAudio();
+            }
+        }, { once: true });
+
+        // Inicialização: Renderiza a UI do piano
+        window.onload = () => {
+            renderPiano();
+            updateKeyDisplay('', 'up'); // Configura o visor para PRONTO
+            // NOTA: setupAllFaders() agora é chamado DENTRO de initializeAudio()
+            // após os efeitos serem inicializados
+        };
+
+    </script>
+</body>
+</html>
