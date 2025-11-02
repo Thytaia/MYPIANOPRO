@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIRTUAL PIANO STAGE</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="piano-body">
+        
+        <div id="control-panel">
+            <div id="lcd-screen">
+                <span class="lcd-text">VIRTUAL PIANO STAGE | PRESET: DX7 E. Piano 1</span>
+                <span class="lcd-text" id="polifonia-display">POLIFONIA: 0/256 VOZES</span>
+            </div>
+            
+            <button id="toggle-cifra">Mostrar Cifras (Desligado)</button>
+        </div>
+
+        <div id="virtual-keyboard">
+        </div>
+
+    </div>
+
+    <script src="js/PresetBank.js"></script>
+    <script src="js/EffectModule.js"></script>
+    <script src="js/AudioEngine.js"></script>
+    <script src="js/VoiceFM.js"></script>
+    <script src="js/VoiceSampler.js"></script>
+    <script src="js/PolyphonyManager.js"></script>
+
+    <script src="script.js"></script>
+
+</body>
+</html>

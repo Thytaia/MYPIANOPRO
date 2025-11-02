@@ -1,0 +1,21 @@
+analisar o código-fonte que está no repositório e sugerir um plano executivo para implantarmos nosso app de piano que contenha:
+
+- no centro do corpo do nosso piano sintetizador digital uma tela lcd dourada tipo similar aos motif /  montage
+
+- que tenha um painel de controle com knobs, fades, layers, voice, split, reverb, chorus, etc, nosso painel precisa simular diversos efeitos importantes, inclusive permitindo misturar a sonoridade de dois presets ou tres presets simuiltaneos tipo select 1: main preset, select preset 2: xnamepreset, select preset 3: xnamepreset, ou seja, para isso nosso emulador virtual piano stage precisa ter polifonia superior a 64 ou se muito limitado para 64, superior a 128 para poder endereçar virtualmente dois ou mais presets em camadas (layer/split) sem que haja distorção
+
+- nosso app deve conter 67 teclas (brancas e pretas em seus intervalos corretos) para que seja o mais fiel possivelmente ha um teclado real de 5.5 oitavas e todas as teclas devem permitir q ativemos nela a identificação  da cifra correspondente ou nao, o teclado do pc será o simulador do teclado virtual e para isso as fileiras de teclas do teclado do pc deve corresponder respectivamente as teclas pretas e brancas em suas posições as 67 teclas do nosso virtual piano stage dever caber no corpo do nosso teclado virtual de forma limpa e organizada para ser o mais fiel possivel ao layout de um teclado real.
+
+- nosso projeto inexoravelmente terá um padrão oficial para o corpo do teclado, painel de controle do teclado, tela lcd, knobs e fades diversos que não importa quantas funções novas e efeitos novos nosso app venha ter, o layout padrao limpo e organizado de um teclado visto de cima deve permanecer ao projeto sem mudanças, a menos que dev de desenvolvimento solicite mudanças de layout etc
+
+- nosso app com  base no repositorio online deve buscar nos codigos opensource todas as rotinas possiveis que permita abstrair o som mais fiel possivel a iconicos teclados da yamaha, korg, roland, kurseweil, serie sy, serie motif, serie montage, serie jv, serie xp, dx7  jupiter 80, sendo assim nosso banco de presets conterá mais de 100 presets para ser escolhido em cada um dos select no painel do teclado quando o usuario quiser usar as layers etc.
+
+timbres iconicos ja discutidos aqui devem ser usdo nosso motor virtual de audio para q tenhamos uma polifonia limpa e agradavel que possa imitar os mais diversos teclados profissionais conhecidos
+
+***
+
+Posto isso documente tudo com implando o plano de desenvolvimento do codigo, inicialmente iniciaremos testes com versoes html rodando direto no navegador, conforme formos lapidando o projeto ai migramos se necessario para python
+
+
+
+Vamos inicie tudo

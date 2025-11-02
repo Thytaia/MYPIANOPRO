@@ -1,0 +1,112 @@
+/* Estilos Base e Design Fiel */
+body {
+    background-color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    font-family: sans-serif;
+}
+
+#piano-body {
+    width: 90%; 
+    background-color: #444;
+    border: 10px solid #222;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Painel de Controle e LCD Dourada */
+#control-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #555;
+    border-radius: 5px;
+}
+
+#lcd-screen {
+    width: 400px;
+    height: 60px;
+    background-color: #e6c56b; /* Dourado/Âmbar */
+    color: #444;
+    border: 2px solid #333;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.2;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+.lcd-text {
+    text-shadow: 1px 1px 0 #fff;
+}
+
+/* Teclado Virtual */
+#virtual-keyboard {
+    display: flex;
+    position: relative;
+    height: 200px; /* Altura padrão de teclado */
+    background-color: #222;
+    border-radius: 5px;
+    margin-top: 10px;
+    /* Correção: Garante que o teclado cabe perfeitamente. */
+    width: 100%; 
+    overflow: hidden; 
+}
+
+.key {
+    position: absolute;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    border: 1px solid #111;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding-bottom: 5px;
+}
+
+/* Correção: Teclas Brancas (Largura ajustada para caberem 39 em 100%) */
+.white-key {
+    width: 2.5641%; /* 100% / 39 (aprox.) */
+    height: 100%;
+    background-color: #f0f0f0;
+    z-index: 1;
+    border-right: 1px solid #111; 
+}
+
+/* Correção: Teclas Pretas (Largura ajustada) */
+.black-key {
+    width: 1.5%; 
+    height: 60%;
+    background-color: #000;
+    z-index: 2;
+    border: 1px solid #111; 
+    border-top: none; 
+}
+
+.key.active { 
+    background-color: #aaa; 
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+.black-key.active {
+    background-color: #333;
+}
+
+.cifra-label {
+    position: absolute;
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+    pointer-events: none;
+}
+.black-key .cifra-label {
+    color: #ccc;
+}
